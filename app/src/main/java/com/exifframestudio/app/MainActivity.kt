@@ -1,12 +1,10 @@
 package com.exifframestudio.app
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
@@ -14,279 +12,248 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Base64
-import android.view.View
+import android.webkit.DownloadListener
 import android.webkit.JavascriptInterface
+import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
-import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
-import androidx.core.view.WindowCompat
 import java.io.File
 import java.io.FileOutputStream
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : ComponentActivity() {
 
     private lateinit var webView: WebView
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
-    private var pendingBase64: String? = null
-    private var pendingFileName: String? = null
+
+    private var pendingBytes: ByteArray? = null
+    private var pendingFileName: String = ""
+    private var pendingMimeType: String = "image/jpeg"
 
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        val results: Array<Uri>? = if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            val data = result.data!!
-            val clipData = data.clipData
-            if (clipData != null && clipData.itemCount > 0) {
-                Array(clipData.itemCount) { i -> clipData.getItemAt(i).uri }
-            } else if (data.data != null) {
-                arrayOf(data.data!!)
-            } else {
-                null
+        val uris = if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data
+            when {
+                data?.clipData != null -> {
+                    val count = data.clipData!!.itemCount
+                    Array(count) { i -> data.clipData!!.getItemAt(i).uri }
+                }
+                data?.data != null -> arrayOf(data.data!!)
+                else -> null
             }
         } else {
             null
         }
-        filePathCallback?.onReceiveValue(results)
+        filePathCallback?.onReceiveValue(uris)
         filePathCallback = null
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    private val storagePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        val bytes = pendingBytes
+        if (isGranted && bytes != null) {
+            writeBytesToMediaStore(bytes, pendingFileName, pendingMimeType)
+        } else {
+            showToast("Izin penyimpanan ditolak, gagal menyimpan ke Galeri.")
+        }
+        pendingBytes = null
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
-        WindowCompat.getInsetsController(window, window.decorView).apply {
-            isAppearanceLightStatusBars = false
-            isAppearanceLightNavigationBars = false
-        }
-
         webView = WebView(this).apply {
-            setBackgroundColor(Color.BLACK)
-            overScrollMode = View.OVER_SCROLL_NEVER
-        }
-        setContentView(webView)
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.allowFileAccess = true
+            settings.allowContentAccess = true
+            settings.useWideViewPort = true
+            settings.loadWithOverviewMode = true
 
-        webView.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            allowFileAccess = true
-            allowContentAccess = true
-            useWideViewPort = true
-            loadWithOverviewMode = true
-            cacheMode = WebSettings.LOAD_DEFAULT
-            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-        }
+            webViewClient = WebViewClient()
 
-        webView.addJavascriptInterface(AndroidBridge(), "AndroidBridge")
+            // Mengizinkan <input type="file"> memilih foto dari Galeri
+            webChromeClient = object : WebChromeClient() {
+                override fun onShowFileChooser(
+                    webView: WebView?,
+                    callback: ValueCallback<Array<Uri>>?,
+                    fileChooserParams: FileChooserParams?
+                ): Boolean {
+                    filePathCallback?.onReceiveValue(null)
+                    filePathCallback = callback
 
-        webView.webViewClient = object : WebViewClient() {}
-
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onShowFileChooser(
-                webView: WebView?,
-                filePathCallback: ValueCallback<Array<Uri>>?,
-                fileChooserParams: FileChooserParams?
-            ): Boolean {
-                this@MainActivity.filePathCallback?.onReceiveValue(null)
-                this@MainActivity.filePathCallback = filePathCallback
-
-                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "image/*"
-                    putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-                }
-                return try {
-                    fileChooserLauncher.launch(Intent.createChooser(intent, "Pilih Foto dari Galeri"))
-                    true
-                } catch (e: Exception) {
-                    this@MainActivity.filePathCallback = null
-                    false
+                    val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "image/*"
+                    }
+                    return try {
+                        fileChooserLauncher.launch(Intent.createChooser(intent, "Pilih Foto"))
+                        true
+                    } catch (e: Exception) {
+                        filePathCallback = null
+                        false
+                    }
                 }
             }
+
+            // Jembatan JS jika HTML memanggil window.AndroidGallery.saveBase64Image(dataUrl, namaFile)
+            addJavascriptInterface(object {
+                @JavascriptInterface
+                fun saveBase64Image(base64Data: String, fileName: String?) {
+                    saveDataUrlToGallery(base64Data, fileName)
+                }
+            }, "AndroidGallery")
+
+            // Menangkap klik tombol <a download> untuk URL offline (data:image/... maupun blob:...)
+            setDownloadListener(DownloadListener { url, _, contentDisposition, mimeType, _ ->
+                val guessedName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                when {
+                    url.startsWith("data:") -> {
+                        saveDataUrlToGallery(url, guessedName)
+                    }
+                    url.startsWith("blob:") -> {
+                        val safeName = guessedName.replace("'", "")
+                        val jsConverter = """
+                            (function() {
+                                fetch('$url')
+                                    .then(res => res.blob())
+                                    .then(blob => {
+                                        const reader = new FileReader();
+                                        reader.onloadend = function() {
+                                            AndroidGallery.saveBase64Image(reader.result, '$safeName');
+                                        };
+                                        reader.readAsDataURL(blob);
+                                    })
+                                    .catch(err => console.error(err));
+                            })();
+                        """.trimIndent()
+                        evaluateJavascript(jsConverter, null)
+                    }
+                    else -> {
+                        showToast("Format unduhan tidak didukung secara offline.")
+                    }
+                }
+            })
         }
+
+        setContentView(webView)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                webView.evaluateJavascript(
-                    "(function(){ return window.handleAndroidBackPress ? window.handleAndroidBackPress() : false; })()"
-                ) { result ->
-                    if (result != "true") {
-                        if (webView.canGoBack()) {
-                            webView.goBack()
-                        } else {
-                            isEnabled = false
-                            onBackPressedDispatcher.onBackPressed()
-                        }
-                    }
+                if (webView.canGoBack()) {
+                    webView.goBack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
                 }
             }
         })
 
+        // Memuat halaman aplikasi offline dari app/src/main/assets/index.html
         webView.loadUrl("file:///android_asset/index.html")
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1001 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            val b64 = pendingBase64
-            val fname = pendingFileName
-            if (b64 != null && fname != null) {
-                pendingBase64 = null
-                pendingFileName = null
-                saveImageToGalleryInternal(b64, fname)
+    private fun saveDataUrlToGallery(dataUrl: String, rawFileName: String?) {
+        try {
+            val mimeType = if (dataUrl.startsWith("data:") && dataUrl.contains(";")) {
+                dataUrl.substringAfter("data:").substringBefore(";")
+            } else {
+                "image/jpeg"
             }
+
+            val extension = if (mimeType.contains("png", ignoreCase = true)) "png" else "jpg"
+            val cleanName = if (!rawFileName.isNullOrBlank() && rawFileName != "downloadfile.bin") {
+                rawFileName
+            } else {
+                "EXIF_${System.currentTimeMillis()}.$extension"
+            }
+
+            val base64Part = dataUrl.substringAfter(",")
+            val imageBytes = Base64.decode(base64Part, Base64.DEFAULT)
+
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                pendingBytes = imageBytes
+                pendingFileName = cleanName
+                pendingMimeType = mimeType
+                storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                return
+            }
+
+            writeBytesToMediaStore(imageBytes, cleanName, mimeType)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            showToast("Gagal memproses gambar: ${e.message}")
         }
     }
 
-    private fun saveImageToGalleryInternal(base64Data: String, fileName: String) {
+    private fun writeBytesToMediaStore(bytes: ByteArray, fileName: String, mimeType: String) {
         try {
-            val cleanBase64 = if (base64Data.contains(",")) {
-                base64Data.substringAfter(",")
-            } else {
-                base64Data
-            }
-            val imageBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
-
-            val isPng = fileName.endsWith(".png", ignoreCase = true) ||
-                    base64Data.startsWith("data:image/png", ignoreCase = true)
-            val mimeType = if (isPng) "image/png" else "image/jpeg"
-            val ext = if (isPng) "png" else "jpg"
-            val baseName = fileName.substringBeforeLast(".").ifBlank { "EXIF_${System.currentTimeMillis()}" }
-            val finalFileName = "${baseName}_${System.currentTimeMillis() % 10000}.$ext"
-
+            val resolver = contentResolver
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val values = ContentValues().apply {
-                    put(MediaStore.Images.Media.DISPLAY_NAME, finalFileName)
-                    put(MediaStore.Images.Media.MIME_TYPE, mimeType)
-                    put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/EXIF Frame Studio")
-                    put(MediaStore.Images.Media.IS_PENDING, 1)
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                    put(
+                        MediaStore.MediaColumns.RELATIVE_PATH,
+                        "${Environment.DIRECTORY_PICTURES}/EXIFFrameStudio"
+                    )
+                    put(MediaStore.MediaColumns.IS_PENDING, 1)
                 }
 
-                val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
                     ?: throw IllegalStateException("Gagal membuat entri MediaStore")
 
-                contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    outputStream.write(imageBytes)
-                    outputStream.flush()
-                } ?: throw IllegalStateException("Gagal membuka stream penyimpanan")
+                resolver.openOutputStream(uri)?.use { out ->
+                    out.write(bytes)
+                }
 
                 values.clear()
-                values.put(MediaStore.Images.Media.IS_PENDING, 0)
-                contentResolver.update(uri, values, null, null)
-
-                runOnUiThread {
-                    Toast.makeText(this, "Tersimpan ke Galeri: $finalFileName", Toast.LENGTH_LONG).show()
-                }
+                values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
             } else {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    != PackageManager.PERMISSION_GRANTED
-                ) {
-                    pendingBase64 = base64Data
-                    pendingFileName = fileName
-                    ActivityCompat.requestPermissions(
-                        this,
-                        arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                        1001
-                    )
-                    return
-                }
-
-                val picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-                val appDir = File(picturesDir, "EXIF Frame Studio")
+                val picturesDir = Environment.getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_PICTURES
+                )
+                val appDir = File(picturesDir, "EXIFFrameStudio")
                 if (!appDir.exists()) appDir.mkdirs()
 
-                val outFile = File(appDir, finalFileName)
-                FileOutputStream(outFile).use { fos ->
-                    fos.write(imageBytes)
-                    fos.flush()
+                val targetFile = File(appDir, fileName)
+                FileOutputStream(targetFile).use { out ->
+                    out.write(bytes)
                 }
 
                 MediaScannerConnection.scanFile(
                     this,
-                    arrayOf(outFile.absolutePath),
+                    arrayOf(targetFile.absolutePath),
                     arrayOf(mimeType),
                     null
                 )
+            }
 
-                runOnUiThread {
-                    Toast.makeText(this, "Tersimpan ke Galeri: $finalFileName", Toast.LENGTH_LONG).show()
-                }
-            }
+            showToast("Tersimpan ke Galeri: Pictures/EXIFFrameStudio/$fileName")
         } catch (e: Exception) {
-            runOnUiThread {
-                Toast.makeText(this, "Gagal menyimpan: ${e.message}", Toast.LENGTH_LONG).show()
-            }
+            e.printStackTrace()
+            showToast("Gagal menyimpan ke Galeri: ${e.message}")
         }
     }
 
-    inner class AndroidBridge {
-
-        @JavascriptInterface
-        fun saveImage(base64Data: String, fileName: String) {
-            saveImageToGalleryInternal(base64Data, fileName)
-        }
-
-        @JavascriptInterface
-        fun shareImage(base64Data: String, fileName: String) {
-            try {
-                val cleanBase64 = if (base64Data.contains(",")) {
-                    base64Data.substringAfter(",")
-                } else {
-                    base64Data
-                }
-                val imageBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
-
-                val isPng = fileName.endsWith(".png", ignoreCase = true) ||
-                        base64Data.startsWith("data:image/png", ignoreCase = true)
-                val mimeType = if (isPng) "image/png" else "image/jpeg"
-                val ext = if (isPng) "png" else "jpg"
-                val safeName = "exif_share_${System.currentTimeMillis()}.$ext"
-
-                val cachePath = File(cacheDir, "shared_images")
-                if (!cachePath.exists()) cachePath.mkdirs()
-
-                // Bersihkan file cache lama
-                cachePath.listFiles()?.forEach { it.delete() }
-
-                val imageFile = File(cachePath, safeName)
-                FileOutputStream(imageFile).use { fos ->
-                    fos.write(imageBytes)
-                    fos.flush()
-                }
-
-                val contentUri = FileProvider.getUriForFile(
-                    this@MainActivity,
-                    "${applicationContext.packageName}.fileprovider",
-                    imageFile
-                )
-
-                runOnUiThread {
-                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = mimeType
-                        putExtra(Intent.EXTRA_STREAM, contentUri)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    startActivity(Intent.createChooser(shareIntent, "Bagikan Foto EXIF"))
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    Toast.makeText(this@MainActivity, "Gagal membagikan: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            }
+    private fun showToast(message: String) {
+        runOnUiThread {
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
     }
 }
