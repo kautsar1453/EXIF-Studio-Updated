@@ -1,0 +1,3352 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <title>EXIF Frame Studio</title>
+  <style>
+    :root {
+      --bg-app: #000000;
+      --bg-surface: #0a0a0c;
+      --bg-subtle: #121216;
+      --bg-elevated: #19191f;
+      --bg-stage: #040405;
+      --border: #1e1e26;
+      --border-strong: #2d2d39;
+      --text-main: #fafafa;
+      --text-muted: #9ca3af;
+      --primary: #f97316;
+      --primary-hover: #ea580c;
+      --primary-soft: rgba(249, 115, 22, 0.14);
+      --primary-border: rgba(249, 115, 22, 0.45);
+      --accent-text: #fb923c;
+      --danger: #f87171;
+      --danger-soft: rgba(239, 68, 68, 0.14);
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-sm: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      background-color: #000000;
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.45;
+      overscroll-behavior-y: contain;
+    }
+
+    .app-shell {
+      max-width: 480px;
+      min-height: 100dvh;
+      margin: 0 auto;
+      background: var(--bg-app);
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid #141419;
+      border-right: 1px solid #141419;
+    }
+
+    /* Top Header */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      height: 62px;
+      padding: 0 14px;
+      background: rgba(5, 5, 7, 0.94);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 11px;
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 44px;
+      padding: 0 15px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-strong);
+      background: var(--bg-elevated);
+      color: var(--text-main);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.1s ease, background-color 0.15s ease, border-color 0.15s ease;
+      user-select: none;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn:disabled {
+      opacity: 0.38;
+      pointer-events: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(249, 115, 22, 0.3);
+    }
+
+    .btn-primary:active {
+      background: var(--primary-hover);
+    }
+
+    .btn-light {
+      background: #fafafa;
+      border-color: #fafafa;
+      color: #050507;
+    }
+
+    .btn-danger-soft {
+      background: var(--danger-soft);
+      border-color: rgba(248, 113, 113, 0.3);
+      color: var(--danger);
+    }
+
+    .btn-block {
+      width: 100%;
+      min-height: 50px;
+      font-size: 15px;
+      font-weight: 700;
+      border-radius: 14px;
+    }
+
+    /* Stage / Preview Canvas Area */
+    .stage-wrapper {
+      background: var(--bg-stage);
+      padding: 16px 14px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .empty-upload-box {
+      width: 100%;
+      min-height: 230px;
+      border: 1.5px dashed #292933;
+      border-radius: 18px;
+      background: #08080a;
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      cursor: pointer;
+      padding: 24px;
+      text-align: center;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .empty-upload-box:active {
+      border-color: var(--primary);
+      background: #0f0f13;
+    }
+
+    .plus-circle {
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      background: var(--primary-soft);
+      border: 1.5px solid var(--primary-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-text);
+    }
+
+    .empty-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .canvas-container {
+      width: 100%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .canvas-container.active {
+      display: flex;
+    }
+
+    #previewCanvas {
+      max-width: 100%;
+      max-height: 360px;
+      width: auto;
+      height: auto;
+      border-radius: 4px;
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.85);
+      cursor: pointer;
+      touch-action: none;
+    }
+
+    /* Filmstrip */
+    .filmstrip {
+      width: 100%;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 12px 2px 2px;
+      scrollbar-width: none;
+    }
+
+    .filmstrip::-webkit-scrollbar {
+      display: none;
+    }
+
+    .filmstrip.active {
+      display: flex;
+    }
+
+    .thumb-item {
+      position: relative;
+      width: 54px;
+      height: 54px;
+      border-radius: 11px;
+      overflow: hidden;
+      border: 2.5px solid #22222b;
+      flex-shrink: 0;
+      cursor: pointer;
+      background: #121216;
+    }
+
+    .thumb-item.selected {
+      border-color: var(--primary);
+    }
+
+    .thumb-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .thumb-remove {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(0, 0, 0, 0.88);
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .add-photo-bar {
+      width: 100%;
+      margin-top: 12px;
+    }
+
+    /* Navigation Tabs (4 Tabs) */
+    .tab-nav {
+      position: sticky;
+      top: 62px;
+      z-index: 25;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      padding: 8px 12px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      min-height: 48px;
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn.active {
+      background: var(--primary-soft);
+      border-color: var(--primary-border);
+      color: var(--accent-text);
+    }
+
+    /* Tab Panels */
+    .panels-container {
+      flex: 1;
+      padding: 14px 12px 36px;
+    }
+
+    .tab-panel {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .tab-panel.active {
+      display: flex;
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .card-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Choice Grids */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .choice-btn {
+      min-height: 50px;
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      font-size: 14px;
+      font-weight: 600;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .choice-btn.center {
+      text-align: center;
+      align-items: center;
+    }
+
+    .choice-btn small {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .choice-btn.active {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+      color: var(--accent-text);
+    }
+
+    .choice-btn.active small {
+      color: #fdba74;
+    }
+
+    /* Collapsible Logo Selector */
+    .logo-collapse-trigger {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      text-align: left;
+      cursor: pointer;
+      padding: 2px 0;
+    }
+
+    .logo-trigger-right {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .logo-active-badge {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--accent-text);
+      background: var(--primary-soft);
+      border: 1px solid var(--primary-border);
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .logo-chevron {
+      color: var(--text-muted);
+      transition: transform 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .logo-collapse-trigger[aria-expanded="true"] .logo-chevron {
+      transform: rotate(180deg);
+      color: var(--accent-text);
+    }
+
+    .logo-collapse-body {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .logo-collapse-body.open {
+      display: flex;
+    }
+
+    /* Brand Logo Grid */
+    .brand-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .brand-chip {
+      min-height: 46px;
+      padding: 8px 6px;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      font-size: 12.5px;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .brand-chip.active {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+      color: var(--accent-text);
+    }
+
+    /* Sliders */
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .value-pill {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-text);
+      background: var(--primary-soft);
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 8px;
+      background: #1e1e26;
+      border-radius: 999px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: 3px solid #fafafa;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+      cursor: pointer;
+    }
+
+    /* Color Swatches */
+    .swatch-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .swatch-btn {
+      min-height: 44px;
+      padding: 0 13px;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      font-size: 13px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+    }
+
+    .swatch-btn.active {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+      color: var(--accent-text);
+    }
+
+    .color-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255, 255, 255, 0.25);
+      flex-shrink: 0;
+    }
+
+    .color-picker-wrap {
+      position: relative;
+      min-height: 44px;
+      padding: 0 13px;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      font-size: 13px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .color-picker-wrap input[type="color"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    /* Inputs */
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .field-item {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .field-item.full {
+      grid-column: 1 / -1;
+    }
+
+    .field-item label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .text-input {
+      width: 100%;
+      min-height: 46px;
+      padding: 0 12px;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      font-size: 14px;
+      font-weight: 500;
+      outline: none;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .text-input::placeholder {
+      color: #52525b;
+    }
+
+    .text-input:focus {
+      border-color: var(--primary);
+      background: #17171d;
+    }
+
+    /* Separator Chips */
+    .sep-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .sep-btn {
+      min-width: 48px;
+      min-height: 46px;
+      padding: 0 12px;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-main);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .sep-btn.active {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+      color: var(--accent-text);
+    }
+
+    .sep-custom-input {
+      width: 86px;
+      min-height: 46px;
+      padding: 0 10px;
+      border-radius: var(--radius-md);
+      border: 1.5px solid var(--border);
+      background: var(--bg-subtle);
+      text-align: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      outline: none;
+    }
+
+    .sep-custom-input:focus {
+      border-color: var(--primary);
+    }
+
+    /* Toggle Switch */
+    .switch-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 44px;
+      cursor: pointer;
+    }
+
+    .switch-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .switch {
+      position: relative;
+      width: 52px;
+      height: 30px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider-switch {
+      position: absolute;
+      inset: 0;
+      background: #24242e;
+      border-radius: 999px;
+      transition: 0.2s;
+    }
+
+    .slider-switch::before {
+      content: "";
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      left: 3px;
+      top: 3px;
+      background: #fafafa;
+      border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+      transition: 0.2s;
+    }
+
+    .switch input:checked + .slider-switch {
+      background: var(--primary);
+    }
+
+    .switch input:checked + .slider-switch::before {
+      transform: translateX(22px);
+    }
+
+    /* 9-Point Position Grid */
+    .pos-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      max-width: 240px;
+      margin: 0 auto;
+    }
+
+    .pos-btn {
+      height: 46px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .pos-btn.active {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+      color: var(--accent-text);
+    }
+
+    /* Fullscreen Preview Modal */
+    .preview-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: #000000;
+      display: none;
+      flex-direction: column;
+    }
+
+    .preview-modal.open {
+      display: flex;
+    }
+
+    .preview-topbar {
+      height: 64px;
+      padding: 0 14px;
+      background: rgba(8, 8, 10, 0.95);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .preview-btn-dark {
+      min-height: 46px;
+      padding: 0 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-elevated);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .preview-viewport {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .preview-viewport.zoomed {
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+
+    #previewFullImage {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border-radius: 4px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.9);
+      transition: transform 0.15s ease;
+    }
+
+    .preview-viewport.zoomed #previewFullImage {
+      max-width: none;
+      max-height: none;
+      width: auto;
+      height: auto;
+    }
+
+    .preview-bottombar {
+      padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+      background: rgba(8, 8, 10, 0.95);
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* Share / Save Bottom Sheet */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .bottom-sheet {
+      width: 100%;
+      max-width: 480px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-strong);
+      border-radius: 22px 22px 0 0;
+      padding: 18px 16px calc(20px + env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 -10px 34px rgba(0, 0, 0, 0.75);
+    }
+
+    .sheet-preview-wrap {
+      background: var(--bg-stage);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sheet-preview-wrap img {
+      max-height: 180px;
+      max-width: 100%;
+      border-radius: 4px;
+      -webkit-touch-callout: default;
+      user-select: auto;
+    }
+
+    .sheet-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      z-index: 200;
+      background: #141418;
+      color: #fafafa;
+      border: 1px solid var(--primary-border);
+      padding: 12px 18px;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.7);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      max-width: 90%;
+      text-align: center;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Header -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+        </div>
+        <h1 class="brand-title">EXIF Frame Studio</h1>
+      </div>
+
+      <div class="header-actions">
+        <button type="button" id="btnShare" class="btn" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+          <span>Bagikan</span>
+        </button>
+        <button type="button" id="btnSave" class="btn btn-primary" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Simpan</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Stage -->
+    <section class="stage-wrapper">
+      <div id="emptyDropBox" class="empty-upload-box" role="button" tabindex="0" aria-label="Pilih foto dari galeri">
+        <div class="plus-circle">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </div>
+        <div class="empty-title">Pilih Foto dari Galeri</div>
+      </div>
+
+      <div id="canvasContainer" class="canvas-container">
+        <canvas id="previewCanvas"></canvas>
+      </div>
+
+      <div id="filmstrip" class="filmstrip"></div>
+
+      <div class="add-photo-bar">
+        <button type="button" id="btnAddPhoto" class="btn btn-primary btn-block">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>Tambah Foto</span>
+        </button>
+      </div>
+
+      <input
+        type="file"
+        id="fileInput"
+        accept="image/*"
+        multiple
+        hidden
+      />
+    </section>
+
+    <!-- 4 Navigation Tabs -->
+    <nav class="tab-nav" role="tablist">
+      <button type="button" class="tab-btn active" data-tab="bingkai" role="tab">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <rect x="7" y="7" width="10" height="10" rx="1"></rect>
+        </svg>
+        <span>Bingkai</span>
+      </button>
+      <button type="button" class="tab-btn" data-tab="exif" role="tab">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        <span>EXIF</span>
+      </button>
+      <button type="button" class="tab-btn" data-tab="watermark" role="tab">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+        </svg>
+        <span>Watermark</span>
+      </button>
+      <button type="button" class="tab-btn" data-tab="gaya" role="tab">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 7 4 4 20 4 20 7"></polyline>
+          <line x1="9" y1="20" x2="15" y2="20"></line>
+          <line x1="12" y1="4" x2="12" y2="20"></line>
+        </svg>
+        <span>Gaya</span>
+      </button>
+    </nav>
+
+    <!-- Tab Panels -->
+    <main class="panels-container">
+      <!-- TAB 1: BINGKAI -->
+      <section id="panel-bingkai" class="tab-panel active">
+        <div class="card">
+          <div class="card-title">Gaya Tata Letak Bingkai</div>
+          <div class="grid-2" id="layoutChoices">
+            <button type="button" class="choice-btn active" data-layout="modern">
+              <span>Modern Bar</span>
+              <small>Bar kamera bersih di bawah</small>
+            </button>
+            <button type="button" class="choice-btn" data-layout="gallery">
+              <span>Gallery Art</span>
+              <small>Bingkai pameran terpusat</small>
+            </button>
+            <button type="button" class="choice-btn" data-layout="blur">
+              <span>Blurred Glass</span>
+              <small>Latar buram warna foto</small>
+            </button>
+            <button type="button" class="choice-btn" data-layout="telemetry">
+              <span>Film Telemetry</span>
+              <small>Gaya kontak film teknis</small>
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="control-group">
+            <div class="control-label-row">
+              <span>Ketebalan Bingkai</span>
+              <span id="valFramePad" class="value-pill">48 px</span>
+            </div>
+            <input type="range" id="rangeFramePad" min="16" max="120" value="48" />
+          </div>
+
+          <div class="control-group">
+            <div class="control-label-row">
+              <span>Radius Sudut Foto</span>
+              <span id="valCornerRadius" class="value-pill">0 px</span>
+            </div>
+            <input type="range" id="rangeCornerRadius" min="0" max="48" value="0" />
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Warna Dasar Bingkai</div>
+          <div class="swatch-row" id="bgSwatches">
+            <button type="button" class="swatch-btn active" data-bg="#ffffff">
+              <span class="color-dot" style="background:#ffffff"></span>
+              <span>Putih</span>
+            </button>
+            <button type="button" class="swatch-btn" data-bg="#0f1115">
+              <span class="color-dot" style="background:#0f1115"></span>
+              <span>Hitam</span>
+            </button>
+            <button type="button" class="swatch-btn" data-bg="#f5f0e6">
+              <span class="color-dot" style="background:#f5f0e6"></span>
+              <span>Krem</span>
+            </button>
+            <button type="button" class="swatch-btn" data-bg="#1e222b">
+              <span class="color-dot" style="background:#1e222b"></span>
+              <span>Abu Gelap</span>
+            </button>
+            <label class="color-picker-wrap">
+              <span class="color-dot" id="customBgDot" style="background:#f97316"></span>
+              <span>Pilih</span>
+              <input type="color" id="bgColorPicker" value="#ffffff" />
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: EXIF -->
+      <section id="panel-exif" class="tab-panel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Garis Pemisah Parameter</div>
+              <div class="card-subtitle">Pemisah antar angka Focal, f/, Shutter, ISO</div>
+            </div>
+          </div>
+          <div class="sep-row" id="sepChoices">
+            <button type="button" class="sep-btn active" data-sep=" • ">•</button>
+            <button type="button" class="sep-btn" data-sep=" | ">|</button>
+            <button type="button" class="sep-btn" data-sep=" / ">/</button>
+            <button type="button" class="sep-btn" data-sep=" - ">-</button>
+            <button type="button" class="sep-btn" data-sep=" · ">·</button>
+            <button type="button" class="sep-btn" data-sep="   ">Spasi</button>
+            <input type="text" id="customSepInput" class="sep-custom-input" maxlength="4" placeholder="Kustom" />
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Editor Data EXIF</div>
+            <div style="display:flex; gap:8px;">
+              <button type="button" id="btnResetExif" class="btn" style="min-height:40px; padding:0 12px; font-size:13px;">Asli</button>
+              <button type="button" id="btnClearExif" class="btn btn-danger-soft" style="min-height:40px; padding:0 12px; font-size:13px;">Kosongkan</button>
+            </div>
+          </div>
+
+          <label class="switch-row">
+            <span class="switch-label">Gunakan Baris Parameter Teks Bebas</span>
+            <span class="switch">
+              <input type="checkbox" id="toggleFreeParam" />
+              <span class="slider-switch"></span>
+            </span>
+          </label>
+
+          <div id="freeParamWrap" class="field-item full" style="display:none;">
+            <label for="inputFreeParam">Teks Baris Parameter Kustom</label>
+            <input type="text" id="inputFreeParam" class="text-input" placeholder="Contoh: 35mm | f/1.8 | 1/250s | ISO 100" />
+          </div>
+
+          <div class="field-grid">
+            <div class="field-item">
+              <label for="exifMake">Merek Kamera</label>
+              <input type="text" id="exifMake" class="text-input" placeholder="Contoh: FUJIFILM" />
+            </div>
+            <div class="field-item">
+              <label for="exifModel">Model Kamera</label>
+              <input type="text" id="exifModel" class="text-input" placeholder="Contoh: X100VI" />
+            </div>
+            <div class="field-item full">
+              <label for="exifLens">Lensa</label>
+              <input type="text" id="exifLens" class="text-input" placeholder="Contoh: 23mm F2.0" />
+            </div>
+            <div class="field-item">
+              <label for="exifFocal">Focal Length</label>
+              <input type="text" id="exifFocal" class="text-input" placeholder="Contoh: 35mm" />
+            </div>
+            <div class="field-item">
+              <label for="exifAperture">Bukaan (Aperture)</label>
+              <input type="text" id="exifAperture" class="text-input" placeholder="Contoh: f/1.8" />
+            </div>
+            <div class="field-item">
+              <label for="exifShutter">Shutter Speed</label>
+              <input type="text" id="exifShutter" class="text-input" placeholder="Contoh: 1/500s" />
+            </div>
+            <div class="field-item">
+              <label for="exifIso">ISO</label>
+              <input type="text" id="exifIso" class="text-input" placeholder="Contoh: ISO 100" />
+            </div>
+            <div class="field-item">
+              <label for="exifDate">Tanggal Foto</label>
+              <input type="text" id="exifDate" class="text-input" placeholder="Contoh: 2026.11.16" />
+            </div>
+            <div class="field-item">
+              <label for="exifCredit">Kredit / Nama</label>
+              <input type="text" id="exifCredit" class="text-input" placeholder="Contoh: @kautsar" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: WATERMARK -->
+      <section id="panel-watermark" class="tab-panel">
+        <div class="card">
+          <label class="switch-row">
+            <span class="switch-label">Aktifkan Watermark di Atas Foto</span>
+            <span class="switch">
+              <input type="checkbox" id="toggleWatermark" />
+              <span class="slider-switch"></span>
+            </span>
+          </label>
+
+          <div class="field-item full">
+            <label for="wmTextInput">Teks Watermark</label>
+            <input type="text" id="wmTextInput" class="text-input" value="@kautsar" placeholder="Masukkan teks watermark..." />
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Gaya Watermark</div>
+          <div class="grid-2" id="wmStyleChoices">
+            <button type="button" class="choice-btn active" data-wmstyle="minimal">
+              <span>Sudut Minimalis</span>
+              <small>Teks bersih dengan bayangan</small>
+            </button>
+            <button type="button" class="choice-btn" data-wmstyle="pill">
+              <span>Kapsul Kaca</span>
+              <small>Latar kapsul transparan</small>
+            </button>
+            <button type="button" class="choice-btn" data-wmstyle="signature">
+              <span>Tanda Tangan</span>
+              <small>Gaya huruf miring artistik</small>
+            </button>
+            <button type="button" class="choice-btn" data-wmstyle="stamp">
+              <span>Stempel Kamera</span>
+              <small>Kotak garis tegas</small>
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Warna & Ukuran Watermark</div>
+          <div class="swatch-row" id="wmColorSwatches">
+            <button type="button" class="swatch-btn active" data-wmcolor="#ffffff">
+              <span class="color-dot" style="background:#ffffff"></span>
+              <span>Putih</span>
+            </button>
+            <button type="button" class="swatch-btn" data-wmcolor="#111827">
+              <span class="color-dot" style="background:#111827"></span>
+              <span>Hitam</span>
+            </button>
+            <button type="button" class="swatch-btn" data-wmcolor="#f97316">
+              <span class="color-dot" style="background:#f97316"></span>
+              <span>Oranye</span>
+            </button>
+            <label class="color-picker-wrap">
+              <span class="color-dot" id="customWmDot" style="background:#f97316"></span>
+              <span>Pilih</span>
+              <input type="color" id="wmColorPicker" value="#ffffff" />
+            </label>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label-row">
+              <span>Ukuran Watermark</span>
+              <span id="valWmSize" class="value-pill">100%</span>
+            </div>
+            <input type="range" id="rangeWmSize" min="50" max="200" value="100" />
+          </div>
+
+          <div class="control-group">
+            <div class="control-label-row">
+              <span>Transparansi (Opasitas)</span>
+              <span id="valWmOpacity" class="value-pill">85%</span>
+            </div>
+            <input type="range" id="rangeWmOpacity" min="10" max="100" value="85" />
+          </div>
+        </div>
+
+        <div class="card">
+          <label class="switch-row">
+            <div>
+              <div class="switch-label">Watermark Berulang (Tiled)</div>
+              <div class="card-subtitle">Memenuhi seluruh permukaan foto secara diagonal</div>
+            </div>
+            <span class="switch">
+              <input type="checkbox" id="toggleWmTiled" />
+              <span class="slider-switch"></span>
+            </span>
+          </label>
+
+          <div id="wmTileControls" class="control-group" style="display:none;">
+            <div class="control-label-row">
+              <span>Kerapatan Pola Berulang</span>
+              <span id="valWmDensity" class="value-pill">Sedang (3)</span>
+            </div>
+            <input type="range" id="rangeWmDensity" min="1" max="5" value="3" />
+          </div>
+
+          <div id="wmPositionControls" class="control-group">
+            <div class="card-subtitle">Ketuk titik grid atau geser langsung watermark di atas foto</div>
+            <div class="pos-grid" id="wmPosGrid">
+              <button type="button" class="pos-btn" data-px="0.12" data-py="0.10">↖</button>
+              <button type="button" class="pos-btn" data-px="0.50" data-py="0.10">↑</button>
+              <button type="button" class="pos-btn" data-px="0.88" data-py="0.10">↗</button>
+              <button type="button" class="pos-btn" data-px="0.12" data-py="0.50">←</button>
+              <button type="button" class="pos-btn" data-px="0.50" data-py="0.50">•</button>
+              <button type="button" class="pos-btn" data-px="0.88" data-py="0.50">→</button>
+              <button type="button" class="pos-btn" data-px="0.12" data-py="0.90">↙</button>
+              <button type="button" class="pos-btn" data-px="0.50" data-py="0.90">↓</button>
+              <button type="button" class="pos-btn active" data-px="0.88" data-py="0.90">↘</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: GAYA & LOGO MEREK -->
+      <section id="panel-gaya" class="tab-panel">
+        <!-- Logo Merk Kamera (Minimalis Collapsible) -->
+        <div class="card">
+          <button type="button" id="btnToggleLogoDrawer" class="logo-collapse-trigger" aria-expanded="false">
+            <div>
+              <div class="card-title">Logo Merek Kamera</div>
+              <div class="card-subtitle">Ketuk untuk memilih logo atau emblem</div>
+            </div>
+            <div class="logo-trigger-right">
+              <span id="activeBrandLabel" class="logo-active-badge">Otomatis</span>
+              <svg class="logo-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
+          </button>
+
+          <div id="logoDrawerBody" class="logo-collapse-body">
+            <div class="brand-grid" id="brandLogoChoices">
+              <button type="button" class="brand-chip active" data-brand="auto" data-label="Otomatis">Otomatis</button>
+              <button type="button" class="brand-chip" data-brand="none" data-label="Tanpa Logo">Tanpa Logo</button>
+              <button type="button" class="brand-chip" data-brand="leica" data-label="Leica" style="color:#f87171;">● Leica</button>
+              <button type="button" class="brand-chip" data-brand="fujifilm" data-label="FUJIFILM">FUJIFILM</button>
+              <button type="button" class="brand-chip" data-brand="sony" data-label="SONY α">SONY α</button>
+              <button type="button" class="brand-chip" data-brand="canon" data-label="Canon" style="color:#f87171;">Canon</button>
+              <button type="button" class="brand-chip" data-brand="nikon" data-label="Nikon" style="color:#facc15;">Nikon</button>
+              <button type="button" class="brand-chip" data-brand="hasselblad" data-label="Hasselblad">H Hasselblad</button>
+              <button type="button" class="brand-chip" data-brand="ricoh" data-label="Ricoh GR">GR Ricoh</button>
+              <button type="button" class="brand-chip" data-brand="lumix" data-label="LUMIX">LUMIX</button>
+              <button type="button" class="brand-chip" data-brand="olympus" data-label="OM / Olympus">OM / Olympus</button>
+              <button type="button" class="brand-chip" data-brand="apple" data-label="Apple">Apple</button>
+              <button type="button" class="brand-chip" data-brand="samsung" data-label="SAMSUNG">SAMSUNG</button>
+              <button type="button" class="brand-chip" data-brand="xiaomi" data-label="Xiaomi">Xiaomi</button>
+              <button type="button" class="brand-chip" data-brand="dji" data-label="DJI">DJI</button>
+            </div>
+
+            <div class="control-group">
+              <div class="control-label-row">
+                <span>Ukuran Logo Merek</span>
+                <span id="valLogoSize" class="value-pill">100%</span>
+              </div>
+              <input type="range" id="rangeLogoSize" min="60" max="150" value="100" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Font EXIF -->
+        <div class="card">
+          <div class="card-title">Pilihan Font EXIF</div>
+          <div class="grid-2" id="fontChoices">
+            <button type="button" class="choice-btn active" data-font="sans" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+              <span>Modern Sans</span>
+              <small>Bersih & modern</small>
+            </button>
+            <button type="button" class="choice-btn" data-font="serif" style="font-family:Georgia,'Times New Roman',serif;">
+              <span>Editorial Serif</span>
+              <small>Klasik majalah foto</small>
+            </button>
+            <button type="button" class="choice-btn" data-font="mono" style="font-family:'Courier New',Courier,monospace;">
+              <span>Tech Mono</span>
+              <small>Presisi teknis kamera</small>
+            </button>
+            <button type="button" class="choice-btn" data-font="humanist" style="font-family:'Trebuchet MS',Verdana,sans-serif;">
+              <span>Humanist Sans</span>
+              <small>Lembut & mudah dibaca</small>
+            </button>
+            <button type="button" class="choice-btn" data-font="narrow" style="font-family:'Arial Narrow',Impact,sans-serif;">
+              <span>Cinema Narrow</span>
+              <small>Tegas & ramping</small>
+            </button>
+            <button type="button" class="choice-btn" data-font="slab" style="font-family:'Lucida Console',Monaco,monospace;">
+              <span>Typewriter Slab</span>
+              <small>Gaya mesin tik</small>
+            </button>
+            <button type="button" class="choice-btn" data-font="italic" style="font-family:'Palatino Linotype','Book Antiqua',Georgia,serif; font-style:italic;">
+              <span>Signature Italic</span>
+              <small>Miring elegan</small>
+            </button>
+          </div>
+        </div>
+
+        <!-- Ukuran & Gaya Teks EXIF -->
+        <div class="card">
+          <div class="control-group">
+            <div class="control-label-row">
+              <span>Ukuran Teks EXIF</span>
+              <span id="valExifSize" class="value-pill">100%</span>
+            </div>
+            <input type="range" id="rangeExifSize" min="60" max="160" value="100" />
+          </div>
+
+          <div class="control-group">
+            <div class="control-label-row">
+              <span>Jarak Antar Huruf</span>
+              <span id="valLetterSpacing" class="value-pill">1 px</span>
+            </div>
+            <input type="range" id="rangeLetterSpacing" min="0" max="10" value="1" />
+          </div>
+
+          <div class="control-group">
+            <div class="card-title">Ketebalan Huruf EXIF</div>
+            <div class="grid-3" id="weightChoices">
+              <button type="button" class="choice-btn center" data-weight="400">Normal</button>
+              <button type="button" class="choice-btn center active" data-weight="600">Tebal</button>
+              <button type="button" class="choice-btn center" data-weight="800">Ekstra</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="card-title">Gaya Penulisan Teks</div>
+            <div class="grid-3" id="caseChoices">
+              <button type="button" class="choice-btn center active" data-case="none">Standar</button>
+              <button type="button" class="choice-btn center" data-case="uppercase">KAPITAL</button>
+              <button type="button" class="choice-btn center" data-case="italic">Miring</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="card-title">Warna Teks EXIF</div>
+            <div class="swatch-row" id="exifColorSwatches">
+              <button type="button" class="swatch-btn active" data-exifcolor="auto">
+                <span>Otomatis</span>
+              </button>
+              <button type="button" class="swatch-btn" data-exifcolor="#111827">
+                <span class="color-dot" style="background:#111827"></span>
+                <span>Hitam</span>
+              </button>
+              <button type="button" class="swatch-btn" data-exifcolor="#ffffff">
+                <span class="color-dot" style="background:#ffffff"></span>
+                <span>Putih</span>
+              </button>
+              <button type="button" class="swatch-btn" data-exifcolor="#f97316">
+                <span class="color-dot" style="background:#f97316"></span>
+                <span>Oranye</span>
+              </button>
+              <label class="color-picker-wrap">
+                <span class="color-dot" id="customExifDot" style="background:#f97316"></span>
+                <span>Pilih</span>
+                <input type="color" id="exifColorPicker" value="#ffffff" />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Elemen Visual Bingkai</div>
+          <label class="switch-row">
+            <span class="switch-label">Tampilkan Info Lensa & Kredit</span>
+            <span class="switch">
+              <input type="checkbox" id="toggleLens" checked />
+              <span class="slider-switch"></span>
+            </span>
+          </label>
+          <label class="switch-row">
+            <span class="switch-label">Tampilkan Tanggal Pengambilan</span>
+            <span class="switch">
+              <input type="checkbox" id="toggleDate" checked />
+              <span class="slider-switch"></span>
+            </span>
+          </label>
+          <label class="switch-row">
+            <span class="switch-label">Garis Pemisah Vertikal</span>
+            <span class="switch">
+              <input type="checkbox" id="toggleDivider" checked />
+              <span class="slider-switch"></span>
+            </span>
+          </label>
+          <label class="switch-row">
+            <span class="switch-label">Bayangan Lembut di Sekitar Foto</span>
+            <span class="switch">
+              <input type="checkbox" id="toggleShadow" />
+              <span class="slider-switch"></span>
+            </span>
+          </label>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Format File Ekspor</div>
+          <div class="grid-2" id="formatChoices">
+            <button type="button" class="choice-btn active" data-format="jpeg">
+              <span>JPEG Kualitas Penuh</span>
+              <small>Ukuran ringkas & cepat dibagikan</small>
+            </button>
+            <button type="button" class="choice-btn" data-format="png">
+              <span>PNG Lossless</span>
+              <small>Tanpa kompresi sama sekali</small>
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Fullscreen Preview Modal -->
+  <div id="previewModal" class="preview-modal" aria-hidden="true">
+    <div class="preview-topbar">
+      <button type="button" id="btnClosePreview" class="preview-btn-dark">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        <span>Kembali</span>
+      </button>
+      <button type="button" id="btnToggleZoom" class="preview-btn-dark">
+        <span>Zoom 100%</span>
+      </button>
+    </div>
+
+    <div id="previewViewport" class="preview-viewport">
+      <img id="previewFullImage" alt="Pratinjau Foto EXIF" />
+    </div>
+
+    <div class="preview-bottombar">
+      <button type="button" id="btnPreviewShare" class="btn">
+        <span>Bagikan</span>
+      </button>
+      <button type="button" id="btnPreviewSave" class="btn btn-primary">
+        <span>Simpan Foto</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Share / Save Fallback Bottom Sheet -->
+  <div id="shareModal" class="modal-backdrop" aria-hidden="true">
+    <div class="bottom-sheet">
+      <div class="card-header">
+        <div id="sheetModalTitle" class="card-title">Bagikan Foto</div>
+        <button type="button" id="btnCloseShareModal" class="btn" style="min-height:40px; padding:0 14px;">Tutup</button>
+      </div>
+
+      <div class="sheet-preview-wrap">
+        <img id="sharePreviewImg" alt="Hasil Render EXIF" />
+        <div id="sheetHintText" class="sheet-hint">Tekan dan tahan gambar di atas lalu pilih Simpan gambar atau Bagikan</div>
+      </div>
+
+      <button type="button" id="btnNativeShareRetry" class="btn btn-primary btn-block">Buka Menu Bagikan / Simpan HP</button>
+      <button type="button" id="btnCopyCaption" class="btn btn-block">Salin Teks Data EXIF</button>
+      <button type="button" id="btnDownloadFromShare" class="btn btn-block">Unduh File Langsung</button>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* =====================================================================
+       * 1. OFFLINE BINARY EXIF PARSER (JPEG APP1 & PNG eXIf)
+       * ===================================================================*/
+      const OfflineExifParser = {
+        parse(arrayBuffer) {
+          const view = new DataView(arrayBuffer);
+          if (view.byteLength < 12) return {};
+
+          if (view.getUint16(0, false) === 0xFFD8) {
+            return this.parseJpeg(view);
+          }
+
+          if (view.getUint32(0, false) === 0x89504E47) {
+            return this.parsePng(view);
+          }
+
+          return {};
+        },
+
+        parseJpeg(view) {
+          let offset = 2;
+          const length = view.byteLength;
+          while (offset + 4 < length) {
+            const marker = view.getUint16(offset, false);
+            offset += 2;
+            if (marker === 0xFFE1) {
+              const segLen = view.getUint16(offset, false);
+              if (offset + 8 <= length) {
+                const header = this.getAscii(view, offset + 2, 4);
+                if (header === 'Exif') {
+                  return this.parseTiff(view, offset + 8);
+                }
+              }
+              offset += segLen;
+            } else if ((marker & 0xFF00) !== 0xFF00) {
+              break;
+            } else if (marker === 0xFFDA || marker === 0xFFD9) {
+              break;
+            } else {
+              if (offset + 2 > length) break;
+              offset += view.getUint16(offset, false);
+            }
+          }
+          return {};
+        },
+
+        parsePng(view) {
+          let offset = 8;
+          const length = view.byteLength;
+          while (offset + 8 < length) {
+            const chunkLen = view.getUint32(offset, false);
+            const chunkType = this.getAscii(view, offset + 4, 4);
+            if (chunkType === 'eXIf' && offset + 8 + chunkLen <= length) {
+              return this.parseTiff(view, offset + 8);
+            }
+            offset += 12 + chunkLen;
+          }
+          return {};
+        },
+
+        parseTiff(view, tiffStart) {
+          if (tiffStart + 8 > view.byteLength) return {};
+          const endian = view.getUint16(tiffStart, false);
+          const little = endian === 0x4949;
+          if (!little && endian !== 0x4D4D) return {};
+          if (view.getUint16(tiffStart + 2, little) !== 0x002A) return {};
+
+          const firstIfdOffset = view.getUint32(tiffStart + 4, little);
+          const tags = {};
+          this.readIfd(view, tiffStart, tiffStart + firstIfdOffset, little, tags);
+
+          if (tags._exifIfdPointer) {
+            this.readIfd(view, tiffStart, tiffStart + tags._exifIfdPointer, little, tags);
+          }
+
+          return this.formatExtractedTags(tags);
+        },
+
+        readIfd(view, tiffStart, dirStart, little, outTags) {
+          if (dirStart + 2 > view.byteLength) return;
+          const entries = view.getUint16(dirStart, little);
+          for (let i = 0; i < entries; i++) {
+            const entryOffset = dirStart + 2 + i * 12;
+            if (entryOffset + 12 > view.byteLength) break;
+
+            const tag = view.getUint16(entryOffset, little);
+            const type = view.getUint16(entryOffset + 2, little);
+            const count = view.getUint32(entryOffset + 4, little);
+            const valOffsetField = entryOffset + 8;
+
+            if (tag === 0x8769) {
+              outTags._exifIfdPointer = view.getUint32(valOffsetField, little);
+              continue;
+            }
+
+            const val = this.readTagValue(view, tiffStart, valOffsetField, type, count, little);
+            if (val !== null && val !== undefined) {
+              outTags[tag] = val;
+            }
+          }
+        },
+
+        readTagValue(view, tiffStart, valOffsetField, type, count, little) {
+          const typeSizes = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8 };
+          const unitSize = typeSizes[type] || 1;
+          const totalBytes = unitSize * count;
+          const dataOffset = totalBytes <= 4
+            ? valOffsetField
+            : tiffStart + view.getUint32(valOffsetField, little);
+
+          if (dataOffset < 0 || dataOffset + totalBytes > view.byteLength) return null;
+
+          if (type === 2) {
+            return this.getAscii(view, dataOffset, count).replace(/ +$/, '').trim();
+          }
+          if (type === 3) {
+            return count === 1 ? view.getUint16(dataOffset, little) : null;
+          }
+          if (type === 4) {
+            return count === 1 ? view.getUint32(dataOffset, little) : null;
+          }
+          if (type === 5) {
+            const num = view.getUint32(dataOffset, little);
+            const den = view.getUint32(dataOffset + 4, little);
+            return den === 0 ? 0 : { num, den, value: num / den };
+          }
+          if (type === 10) {
+            const num = view.getInt32(dataOffset, little);
+            const den = view.getInt32(dataOffset + 4, little);
+            return den === 0 ? 0 : { num, den, value: num / den };
+          }
+          return null;
+        },
+
+        getAscii(view, start, length) {
+          let str = '';
+          const end = Math.min(start + length, view.byteLength);
+          for (let i = start; i < end; i++) {
+            const code = view.getUint8(i);
+            if (code === 0) break;
+            str += String.fromCharCode(code);
+          }
+          return str;
+        },
+
+        formatExtractedTags(raw) {
+          const make = (raw[0x010F] || '').toString().trim();
+          let model = (raw[0x0110] || '').toString().trim();
+          if (make && model.toUpperCase().startsWith(make.toUpperCase())) {
+            model = model.slice(make.length).trim();
+          }
+
+          const lens = (raw[0xA434] || '').toString().trim();
+
+          let focal = '';
+          if (raw[0x920A] && raw[0x920A].value) {
+            const fVal = Math.round(raw[0x920A].value * 10) / 10;
+            focal = `${fVal}mm`;
+          }
+
+          let aperture = '';
+          if (raw[0x829D] && raw[0x829D].value) {
+            const aVal = Math.round(raw[0x829D].value * 10) / 10;
+            aperture = `f/${aVal}`;
+          }
+
+          let shutter = '';
+          if (raw[0x829A] && raw[0x829A].value) {
+            const sVal = raw[0x829A].value;
+            if (sVal >= 1) {
+              shutter = `${Math.round(sVal * 10) / 10}s`;
+            } else if (sVal > 0) {
+              shutter = `1/${Math.round(1 / sVal)}s`;
+            }
+          }
+
+          let iso = '';
+          if (raw[0x8827]) {
+            iso = `ISO ${raw[0x8827]}`;
+          }
+
+          let date = '';
+          const rawDate = raw[0x9003] || raw[0x0132] || '';
+          if (typeof rawDate === 'string' && rawDate.length >= 10) {
+            date = rawDate.slice(0, 10).replace(/:/g, '.');
+          }
+
+          return { make, model, lens, focal, aperture, shutter, iso, date, credit: '' };
+        }
+      };
+
+      /* =====================================================================
+       * 2. APPLICATION STATE
+       * ===================================================================*/
+      const FONT_STACKS = {
+        sans: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+        serif: 'Georgia, "Times New Roman", Times, serif',
+        mono: '"Courier New", Courier, monospace',
+        humanist: '"Trebuchet MS", "Gill Sans", Verdana, sans-serif',
+        narrow: '"Arial Narrow", Impact, "Segoe UI", sans-serif',
+        slab: '"Lucida Console", Monaco, "Courier New", monospace',
+        italic: '"Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif'
+      };
+
+      const state = {
+        photos: [],
+        activeIndex: -1,
+        layout: 'modern',
+        framePad: 48,
+        cornerRadius: 0,
+        bgColor: '#ffffff',
+        separator: ' • ',
+        useFreeParam: false,
+        freeParamText: '',
+        wmEnabled: false,
+        wmText: '@kautsar',
+        wmStyle: 'minimal',
+        wmColor: '#ffffff',
+        wmSize: 100,
+        wmOpacity: 85,
+        wmTiled: false,
+        wmDensity: 3,
+        wmPos: { x: 0.88, y: 0.90 },
+        brandLogo: 'auto',
+        logoSize: 100,
+        fontFamily: 'sans',
+        exifSize: 100,
+        letterSpacing: 1,
+        fontWeight: '600',
+        textCase: 'none',
+        exifColor: 'auto',
+        showLens: true,
+        showDate: true,
+        showDivider: true,
+        showShadow: false,
+        exportFormat: 'jpeg'
+      };
+
+      let isPreviewOpen = false;
+      let isPreviewZoomed = false;
+      let isShareModalOpen = false;
+      let isDraggingWm = false;
+      let pointerDownPos = null;
+      let pointerMoved = false;
+      let lastExportPayload = null;
+
+      /* =====================================================================
+       * 3. DOM REFERENCES
+       * ===================================================================*/
+      const el = {
+        emptyDropBox: document.getElementById('emptyDropBox'),
+        canvasContainer: document.getElementById('canvasContainer'),
+        previewCanvas: document.getElementById('previewCanvas'),
+        filmstrip: document.getElementById('filmstrip'),
+        btnAddPhoto: document.getElementById('btnAddPhoto'),
+        fileInput: document.getElementById('fileInput'),
+        btnShare: document.getElementById('btnShare'),
+        btnSave: document.getElementById('btnSave'),
+
+        // Frame controls
+        layoutChoices: document.getElementById('layoutChoices'),
+        rangeFramePad: document.getElementById('rangeFramePad'),
+        valFramePad: document.getElementById('valFramePad'),
+        rangeCornerRadius: document.getElementById('rangeCornerRadius'),
+        valCornerRadius: document.getElementById('valCornerRadius'),
+        bgSwatches: document.getElementById('bgSwatches'),
+        bgColorPicker: document.getElementById('bgColorPicker'),
+        customBgDot: document.getElementById('customBgDot'),
+
+        // EXIF controls
+        sepChoices: document.getElementById('sepChoices'),
+        customSepInput: document.getElementById('customSepInput'),
+        btnResetExif: document.getElementById('btnResetExif'),
+        btnClearExif: document.getElementById('btnClearExif'),
+        toggleFreeParam: document.getElementById('toggleFreeParam'),
+        freeParamWrap: document.getElementById('freeParamWrap'),
+        inputFreeParam: document.getElementById('inputFreeParam'),
+        exifMake: document.getElementById('exifMake'),
+        exifModel: document.getElementById('exifModel'),
+        exifLens: document.getElementById('exifLens'),
+        exifFocal: document.getElementById('exifFocal'),
+        exifAperture: document.getElementById('exifAperture'),
+        exifShutter: document.getElementById('exifShutter'),
+        exifIso: document.getElementById('exifIso'),
+        exifDate: document.getElementById('exifDate'),
+        exifCredit: document.getElementById('exifCredit'),
+
+        // Watermark controls
+        toggleWatermark: document.getElementById('toggleWatermark'),
+        wmTextInput: document.getElementById('wmTextInput'),
+        wmStyleChoices: document.getElementById('wmStyleChoices'),
+        wmColorSwatches: document.getElementById('wmColorSwatches'),
+        wmColorPicker: document.getElementById('wmColorPicker'),
+        customWmDot: document.getElementById('customWmDot'),
+        rangeWmSize: document.getElementById('rangeWmSize'),
+        valWmSize: document.getElementById('valWmSize'),
+        rangeWmOpacity: document.getElementById('rangeWmOpacity'),
+        valWmOpacity: document.getElementById('valWmOpacity'),
+        toggleWmTiled: document.getElementById('toggleWmTiled'),
+        wmTileControls: document.getElementById('wmTileControls'),
+        rangeWmDensity: document.getElementById('rangeWmDensity'),
+        valWmDensity: document.getElementById('valWmDensity'),
+        wmPositionControls: document.getElementById('wmPositionControls'),
+        wmPosGrid: document.getElementById('wmPosGrid'),
+
+        // Gaya & Logo controls
+        btnToggleLogoDrawer: document.getElementById('btnToggleLogoDrawer'),
+        activeBrandLabel: document.getElementById('activeBrandLabel'),
+        logoDrawerBody: document.getElementById('logoDrawerBody'),
+        brandLogoChoices: document.getElementById('brandLogoChoices'),
+        rangeLogoSize: document.getElementById('rangeLogoSize'),
+        valLogoSize: document.getElementById('valLogoSize'),
+        fontChoices: document.getElementById('fontChoices'),
+        rangeExifSize: document.getElementById('rangeExifSize'),
+        valExifSize: document.getElementById('valExifSize'),
+        rangeLetterSpacing: document.getElementById('rangeLetterSpacing'),
+        valLetterSpacing: document.getElementById('valLetterSpacing'),
+        weightChoices: document.getElementById('weightChoices'),
+        caseChoices: document.getElementById('caseChoices'),
+        exifColorSwatches: document.getElementById('exifColorSwatches'),
+        exifColorPicker: document.getElementById('exifColorPicker'),
+        customExifDot: document.getElementById('customExifDot'),
+        toggleLens: document.getElementById('toggleLens'),
+        toggleDate: document.getElementById('toggleDate'),
+        toggleDivider: document.getElementById('toggleDivider'),
+        toggleShadow: document.getElementById('toggleShadow'),
+        formatChoices: document.getElementById('formatChoices'),
+
+        // Modals & Toast
+        previewModal: document.getElementById('previewModal'),
+        btnClosePreview: document.getElementById('btnClosePreview'),
+        btnToggleZoom: document.getElementById('btnToggleZoom'),
+        previewViewport: document.getElementById('previewViewport'),
+        previewFullImage: document.getElementById('previewFullImage'),
+        btnPreviewShare: document.getElementById('btnPreviewShare'),
+        btnPreviewSave: document.getElementById('btnPreviewSave'),
+
+        shareModal: document.getElementById('shareModal'),
+        sheetModalTitle: document.getElementById('sheetModalTitle'),
+        sheetHintText: document.getElementById('sheetHintText'),
+        btnCloseShareModal: document.getElementById('btnCloseShareModal'),
+        sharePreviewImg: document.getElementById('sharePreviewImg'),
+        btnNativeShareRetry: document.getElementById('btnNativeShareRetry'),
+        btnCopyCaption: document.getElementById('btnCopyCaption'),
+        btnDownloadFromShare: document.getElementById('btnDownloadFromShare'),
+
+        toast: document.getElementById('toast')
+      };
+
+      /* =====================================================================
+       * 4. HELPER UTILITIES
+       * ===================================================================*/
+      let toastTimer = null;
+      function showToast(msg) {
+        el.toast.textContent = msg;
+        el.toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.toast.classList.remove('show'), 2600);
+      }
+
+      function getActivePhoto() {
+        if (state.activeIndex < 0 || state.activeIndex >= state.photos.length) return null;
+        return state.photos[state.activeIndex];
+      }
+
+      function isColorDark(hex) {
+        if (!hex || !hex.startsWith('#')) return false;
+        const clean = hex.replace('#', '');
+        const full = clean.length === 3
+          ? clean.split('').map(c => c + c).join('')
+          : clean.padEnd(6, '0');
+        const r = parseInt(full.slice(0, 2), 16);
+        const g = parseInt(full.slice(2, 4), 16);
+        const b = parseInt(full.slice(4, 6), 16);
+        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        return luma < 135;
+      }
+
+      function applyTextTransform(str) {
+        if (!str) return '';
+        if (state.textCase === 'uppercase') return str.toUpperCase();
+        return str;
+      }
+
+      function buildParameterLine(exif) {
+        if (state.useFreeParam) {
+          return applyTextTransform(state.freeParamText.trim());
+        }
+        const parts = [exif.focal, exif.aperture, exif.shutter, exif.iso]
+          .map(v => (v || '').trim())
+          .filter(Boolean);
+        return applyTextTransform(parts.join(state.separator));
+      }
+
+      function buildCameraTitle(exif) {
+        const title = [exif.make, exif.model].map(v => (v || '').trim()).filter(Boolean).join(' ');
+        return applyTextTransform(title);
+      }
+
+      function buildSubLeftLine(exif) {
+        if (!state.showLens) return '';
+        const parts = [exif.lens, exif.credit].map(v => (v || '').trim()).filter(Boolean);
+        return applyTextTransform(parts.join(' • '));
+      }
+
+      function buildCaptionSummary() {
+        const p = getActivePhoto();
+        if (!p) return '';
+        const cam = buildCameraTitle(p.exif);
+        const params = buildParameterLine(p.exif);
+        const lens = buildSubLeftLine(p.exif);
+        const date = state.showDate ? (p.exif.date || '').trim() : '';
+        return [cam, lens, params, date].filter(Boolean).join(' | ');
+      }
+
+      /* =====================================================================
+       * 5. VECTOR CAMERA BRAND EMBLEM ENGINE (100% OFFLINE)
+       * ===================================================================*/
+      function resolveCameraBrand(exif) {
+        if (state.brandLogo !== 'auto') return state.brandLogo;
+        const raw = `${exif.make || ''} ${exif.model || ''}`.toLowerCase();
+        if (raw.includes('leica')) return 'leica';
+        if (raw.includes('fuji')) return 'fujifilm';
+        if (raw.includes('sony') || raw.includes('ilce') || raw.includes('zv-')) return 'sony';
+        if (raw.includes('canon') || raw.includes('eos')) return 'canon';
+        if (raw.includes('nikon')) return 'nikon';
+        if (raw.includes('hasselblad')) return 'hasselblad';
+        if (raw.includes('ricoh') || raw.includes('gr iii') || raw.includes('gr ii')) return 'ricoh';
+        if (raw.includes('lumix') || raw.includes('panasonic')) return 'lumix';
+        if (raw.includes('olympus') || raw.includes('om system') || raw.includes('om-')) return 'olympus';
+        if (raw.includes('apple') || raw.includes('iphone')) return 'apple';
+        if (raw.includes('samsung') || raw.includes('sm-')) return 'samsung';
+        if (raw.includes('xiaomi') || raw.includes('redmi') || raw.includes('poco')) return 'xiaomi';
+        if (raw.includes('dji') || raw.includes('fc')) return 'dji';
+        return 'none';
+      }
+
+      function drawBrandEmblem(ctx, brand, anchorX, centerY, baseHeight, darkBg, align = 'left') {
+        if (!brand || brand === 'none') return 0;
+
+        const scale = state.logoSize / 100;
+        const h = Math.round(baseHeight * scale);
+        const monoColor = darkBg ? '#f8fafc' : '#111827';
+
+        let width = h;
+        ctx.save();
+
+        if (brand === 'leica') {
+          width = h * 1.15;
+        } else if (brand === 'nikon') {
+          width = h * 1.12;
+        } else if (brand === 'ricoh') {
+          width = h * 1.25;
+        } else if (brand === 'hasselblad') {
+          width = h * 1.05;
+        } else if (brand === 'apple') {
+          width = h * 0.95;
+        } else if (brand === 'xiaomi') {
+          width = h * 1.05;
+        } else if (brand === 'fujifilm') {
+          ctx.font = `800 ${Math.round(h * 0.44)}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+          width = ctx.measureText('FUJIFILM').width + h * 0.16;
+        } else if (brand === 'sony') {
+          ctx.font = `700 ${Math.round(h * 0.48)}px Georgia, "Times New Roman", serif`;
+          width = ctx.measureText('SONY α').width + h * 0.14;
+        } else if (brand === 'canon') {
+          ctx.font = `800 ${Math.round(h * 0.56)}px Georgia, "Times New Roman", serif`;
+          width = ctx.measureText('Canon').width + h * 0.14;
+        } else if (brand === 'lumix') {
+          ctx.font = `800 ${Math.round(h * 0.46)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          width = ctx.measureText('LUMIX').width + h * 0.14;
+        } else if (brand === 'olympus') {
+          ctx.font = `800 ${Math.round(h * 0.42)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          width = ctx.measureText('OM SYSTEM').width + h * 0.14;
+        } else if (brand === 'samsung') {
+          ctx.font = `800 ${Math.round(h * 0.42)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          width = ctx.measureText('SAMSUNG').width + h * 0.14;
+        } else if (brand === 'dji') {
+          ctx.font = `italic 900 ${Math.round(h * 0.58)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          width = ctx.measureText('DJI').width + h * 0.16;
+        }
+
+        let leftX = anchorX;
+        if (align === 'right') leftX = anchorX - width;
+        else if (align === 'center') leftX = anchorX - width / 2;
+
+        const cx = leftX + width / 2;
+        const cy = centerY;
+
+        if (brand === 'leica') {
+          const r = h * 0.52;
+          ctx.fillStyle = '#e20613';
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = `italic 700 ${Math.round(r * 0.82)}px Georgia, "Times New Roman", serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Leica', cx, cy + r * 0.04);
+        } else if (brand === 'nikon') {
+          const box = h * 1.02;
+          const bx = cx - box / 2;
+          const by = cy - box / 2;
+          ctx.fillStyle = '#ffe600';
+          ctx.beginPath();
+          ctx.roundRect(bx, by, box, box, box * 0.14);
+          ctx.fill();
+
+          ctx.fillStyle = '#111111';
+          ctx.font = `italic 800 ${Math.round(box * 0.31)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Nikon', cx, cy + box * 0.03);
+        } else if (brand === 'ricoh') {
+          const bw = h * 1.18;
+          const bh = h * 0.78;
+          ctx.strokeStyle = monoColor;
+          ctx.lineWidth = Math.max(1.5, h * 0.065);
+          ctx.strokeRect(cx - bw / 2, cy - bh / 2, bw, bh);
+
+          ctx.fillStyle = monoColor;
+          ctx.font = `800 ${Math.round(bh * 0.56)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('GR', cx, cy + bh * 0.04);
+        } else if (brand === 'hasselblad') {
+          ctx.fillStyle = monoColor;
+          ctx.font = `700 ${Math.round(h * 0.84)}px Georgia, "Times New Roman", serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('H', cx, cy + h * 0.03);
+        } else if (brand === 'xiaomi') {
+          const box = h * 0.96;
+          ctx.fillStyle = '#ff6900';
+          ctx.beginPath();
+          ctx.roundRect(cx - box / 2, cy - box / 2, box, box, box * 0.28);
+          ctx.fill();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = `700 ${Math.round(box * 0.44)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('mi', cx, cy + box * 0.03);
+        } else if (brand === 'apple') {
+          const r = h * 0.34;
+          ctx.fillStyle = monoColor;
+          ctx.beginPath();
+          ctx.arc(cx, cy + r * 0.15, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.ellipse(cx + r * 0.18, cy - r * 0.98, r * 0.22, r * 0.38, Math.PI / 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = darkBg ? '#0f1115' : state.bgColor;
+          ctx.beginPath();
+          ctx.arc(cx + r * 0.92, cy + r * 0.05, r * 0.42, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (brand === 'fujifilm') {
+          ctx.fillStyle = monoColor;
+          ctx.font = `800 ${Math.round(h * 0.44)}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('FUJIFILM', cx, cy);
+          ctx.fillStyle = '#e60012';
+          ctx.fillRect(cx - width * 0.12, cy + h * 0.24, width * 0.24, Math.max(2, h * 0.06));
+        } else if (brand === 'sony') {
+          ctx.fillStyle = monoColor;
+          ctx.font = `700 ${Math.round(h * 0.48)}px Georgia, "Times New Roman", serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('SONY ', cx - h * 0.14, cy);
+          ctx.fillStyle = '#ea580c';
+          ctx.font = `italic 700 ${Math.round(h * 0.54)}px Georgia, serif`;
+          ctx.fillText('α', cx + width * 0.34, cy);
+        } else if (brand === 'canon') {
+          ctx.fillStyle = '#cc0000';
+          ctx.font = `800 ${Math.round(h * 0.56)}px Georgia, "Times New Roman", serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Canon', cx, cy);
+        } else if (brand === 'lumix') {
+          ctx.fillStyle = monoColor;
+          ctx.font = `800 ${Math.round(h * 0.46)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('LUMIX', cx, cy);
+        } else if (brand === 'olympus') {
+          ctx.fillStyle = monoColor;
+          ctx.font = `800 ${Math.round(h * 0.42)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('OM SYSTEM', cx, cy);
+        } else if (brand === 'samsung') {
+          ctx.fillStyle = monoColor;
+          ctx.font = `800 ${Math.round(h * 0.42)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('SAMSUNG', cx, cy);
+        } else if (brand === 'dji') {
+          ctx.fillStyle = monoColor;
+          ctx.font = `italic 900 ${Math.round(h * 0.58)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('DJI', cx, cy);
+        }
+
+        ctx.restore();
+        return width;
+      }
+
+      /* =====================================================================
+       * 6. PHOTO UPLOAD & EXIF EXTRACTION
+       * ===================================================================*/
+      async function handleFilesSelected(fileList) {
+        const files = Array.from(fileList || []).filter(f => f.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|tiff?)$/i.test(f.name));
+        if (!files.length) return;
+
+        for (const file of files) {
+          try {
+            const buffer = await file.arrayBuffer();
+            const parsedExif = OfflineExifParser.parse(buffer);
+            const objectUrl = URL.createObjectURL(file);
+            const img = await loadImage(objectUrl);
+
+            const thumbCanvas = document.createElement('canvas');
+            thumbCanvas.width = 110;
+            thumbCanvas.height = 110;
+            const tCtx = thumbCanvas.getContext('2d');
+            const minSide = Math.min(img.naturalWidth, img.naturalHeight);
+            const sx = (img.naturalWidth - minSide) / 2;
+            const sy = (img.naturalHeight - minSide) / 2;
+            tCtx.drawImage(img, sx, sy, minSide, minSide, 0, 0, 110, 110);
+            const thumbUrl = thumbCanvas.toDataURL('image/jpeg', 0.75);
+            URL.revokeObjectURL(objectUrl);
+
+            const photoObj = {
+              id: Date.now() + Math.random(),
+              name: file.name.replace(/\.[^.]+$/, ''),
+              img,
+              thumbUrl,
+              originalExif: { ...parsedExif },
+              exif: { ...parsedExif }
+            };
+            state.photos.push(photoObj);
+          } catch (err) {
+            console.error('Gagal memuat foto:', err);
+          }
+        }
+
+        if (state.photos.length > 0) {
+          selectPhoto(state.photos.length - 1);
+          const current = getActivePhoto();
+          const hasAnyExif = current && Object.values(current.exif).some(Boolean);
+          showToast(hasAnyExif ? 'Foto & data EXIF berhasil dimuat' : 'Foto dimuat — silakan isi data EXIF di tab EXIF');
+        }
+      }
+
+      function loadImage(src) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = src;
+        });
+      }
+
+      function selectPhoto(index) {
+        if (index < 0 || index >= state.photos.length) {
+          state.activeIndex = -1;
+          el.emptyDropBox.style.display = 'flex';
+          el.canvasContainer.classList.remove('active');
+          el.filmstrip.classList.remove('active');
+          el.btnShare.disabled = true;
+          el.btnSave.disabled = true;
+          return;
+        }
+
+        state.activeIndex = index;
+        el.emptyDropBox.style.display = 'none';
+        el.canvasContainer.classList.add('active');
+        el.btnShare.disabled = false;
+        el.btnSave.disabled = false;
+
+        syncExifInputsFromState();
+        renderFilmstrip();
+        renderPreview();
+      }
+
+      function removePhoto(index) {
+        if (index < 0 || index >= state.photos.length) return;
+        state.photos.splice(index, 1);
+        if (state.photos.length === 0) {
+          selectPhoto(-1);
+        } else {
+          const nextIdx = Math.min(index, state.photos.length - 1);
+          selectPhoto(nextIdx);
+        }
+      }
+
+      function renderFilmstrip() {
+        if (state.photos.length <= 1) {
+          el.filmstrip.classList.remove('active');
+          el.filmstrip.innerHTML = '';
+          return;
+        }
+
+        el.filmstrip.classList.add('active');
+        el.filmstrip.innerHTML = '';
+        state.photos.forEach((p, idx) => {
+          const item = document.createElement('div');
+          item.className = 'thumb-item' + (idx === state.activeIndex ? ' selected' : '');
+          item.innerHTML = `<img src="${p.thumbUrl}" alt="" /><button type="button" class="thumb-remove" aria-label="Hapus foto">×</button>`;
+          item.addEventListener('click', (e) => {
+            if (e.target.classList.contains('thumb-remove')) {
+              e.stopPropagation();
+              removePhoto(idx);
+            } else {
+              selectPhoto(idx);
+            }
+          });
+          el.filmstrip.appendChild(item);
+        });
+      }
+
+      function syncExifInputsFromState() {
+        const p = getActivePhoto();
+        if (!p) return;
+        el.exifMake.value = p.exif.make || '';
+        el.exifModel.value = p.exif.model || '';
+        el.exifLens.value = p.exif.lens || '';
+        el.exifFocal.value = p.exif.focal || '';
+        el.exifAperture.value = p.exif.aperture || '';
+        el.exifShutter.value = p.exif.shutter || '';
+        el.exifIso.value = p.exif.iso || '';
+        el.exifDate.value = p.exif.date || '';
+        el.exifCredit.value = p.exif.credit || '';
+      }
+
+      /* =====================================================================
+       * 7. CANVAS COMPOSITION ENGINE (PREVIEW & FULL-RES EXPORT)
+       * ===================================================================*/
+      let lastPhotoRect = { x: 0, y: 0, w: 0, h: 0 };
+
+      function drawRoundedImage(ctx, img, x, y, w, h, radius) {
+        ctx.save();
+        if (radius > 0) {
+          const r = Math.min(radius, w / 2, h / 2);
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.lineTo(x + w - r, y);
+          ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+          ctx.lineTo(x + w, y + h - r);
+          ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+          ctx.lineTo(x + r, y + h);
+          ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+          ctx.lineTo(x, y + r);
+          ctx.quadraticCurveTo(x, y, x + r, y);
+          ctx.closePath();
+          ctx.clip();
+        }
+        ctx.drawImage(img, x, y, w, h);
+        ctx.restore();
+      }
+
+      function drawTextWithSpacing(ctx, text, x, y, spacing, align = 'left') {
+        if (!text) return;
+        if (!spacing || spacing <= 0) {
+          ctx.textAlign = align;
+          ctx.fillText(text, x, y);
+          return;
+        }
+        const chars = Array.from(text);
+        let totalWidth = 0;
+        const widths = chars.map(ch => {
+          const w = ctx.measureText(ch).width;
+          totalWidth += w + spacing;
+          return w;
+        });
+        totalWidth -= spacing;
+
+        let cursorX = x;
+        if (align === 'center') cursorX = x - totalWidth / 2;
+        else if (align === 'right') cursorX = x - totalWidth;
+
+        ctx.textAlign = 'left';
+        for (let i = 0; i < chars.length; i++) {
+          ctx.fillText(chars[i], cursorX, y);
+          cursorX += widths[i] + spacing;
+        }
+      }
+
+      function drawBlurredBackdrop(ctx, img, totalW, totalH) {
+        ctx.save();
+        const smallCanvas = document.createElement('canvas');
+        smallCanvas.width = 48;
+        smallCanvas.height = 48;
+        const sCtx = smallCanvas.getContext('2d');
+        sCtx.drawImage(img, 0, 0, 48, 48);
+
+        if ('filter' in ctx) {
+          ctx.filter = `blur(${Math.round(Math.max(totalW, totalH) * 0.03)}px) brightness(0.75)`;
+        }
+        const scale = Math.max(totalW / img.naturalWidth, totalH / img.naturalHeight) * 1.15;
+        const dw = img.naturalWidth * scale;
+        const dh = img.naturalHeight * scale;
+        ctx.drawImage(smallCanvas, (totalW - dw) / 2, (totalH - dh) / 2, dw, dh);
+        ctx.filter = 'none';
+
+        ctx.fillStyle = 'rgba(10, 12, 16, 0.36)';
+        ctx.fillRect(0, 0, totalW, totalH);
+        ctx.restore();
+      }
+
+      function drawWatermarkOverlay(ctx, photoRect, scaleFactor) {
+        if (!state.wmEnabled) return;
+        const text = (state.wmText || '').trim();
+        if (!text) return;
+
+        const baseFontSize = Math.max(12, Math.round(photoRect.w * 0.032 * (state.wmSize / 100)));
+        const opacity = state.wmOpacity / 100;
+        const color = state.wmColor || '#ffffff';
+        const isDarkText = isColorDark(color);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(photoRect.x, photoRect.y, photoRect.w, photoRect.h);
+        ctx.clip();
+
+        ctx.globalAlpha = opacity;
+
+        const renderSingleStamp = (cx, cy) => {
+          ctx.save();
+          ctx.translate(cx, cy);
+
+          if (state.wmStyle === 'signature') {
+            ctx.font = `italic 600 ${Math.round(baseFontSize * 1.25)}px Georgia, "Times New Roman", serif`;
+            ctx.fillStyle = color;
+            ctx.shadowColor = isDarkText ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.55)';
+            ctx.shadowBlur = 6 * scaleFactor;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 0, 0);
+          } else if (state.wmStyle === 'pill') {
+            ctx.font = `600 ${baseFontSize}px ${FONT_STACKS.sans}`;
+            const metrics = ctx.measureText(text);
+            const padX = baseFontSize * 0.85;
+            const padY = baseFontSize * 0.45;
+            const boxW = metrics.width + padX * 2;
+            const boxH = baseFontSize + padY * 2;
+            const r = boxH / 2;
+
+            ctx.fillStyle = isDarkText ? 'rgba(255, 255, 255, 0.72)' : 'rgba(15, 18, 24, 0.62)';
+            ctx.beginPath();
+            ctx.roundRect(-boxW / 2, -boxH / 2, boxW, boxH, r);
+            ctx.fill();
+
+            ctx.strokeStyle = isDarkText ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.28)';
+            ctx.lineWidth = Math.max(1, 1.5 * scaleFactor);
+            ctx.stroke();
+
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 0, 1 * scaleFactor);
+          } else if (state.wmStyle === 'stamp') {
+            ctx.font = `700 ${Math.round(baseFontSize * 0.92)}px ${FONT_STACKS.mono}`;
+            const label = text.toUpperCase();
+            const metrics = ctx.measureText(label);
+            const padX = baseFontSize * 0.65;
+            const padY = baseFontSize * 0.38;
+            const boxW = metrics.width + padX * 2;
+            const boxH = baseFontSize + padY * 2;
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = Math.max(1.5, 2 * scaleFactor);
+            ctx.strokeRect(-boxW / 2, -boxH / 2, boxW, boxH);
+
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, 0, 1 * scaleFactor);
+          } else {
+            ctx.font = `600 ${baseFontSize}px ${FONT_STACKS.sans}`;
+            ctx.fillStyle = color;
+            ctx.shadowColor = isDarkText ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.65)';
+            ctx.shadowBlur = 5 * scaleFactor;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 0, 0);
+          }
+          ctx.restore();
+        };
+
+        if (state.wmTiled) {
+          const densityMap = { 1: 3.4, 2: 2.6, 3: 2.0, 4: 1.5, 5: 1.15 };
+          const mult = densityMap[state.wmDensity] || 2.0;
+          ctx.font = `600 ${baseFontSize}px ${FONT_STACKS.sans}`;
+          const textW = Math.max(ctx.measureText(text).width, baseFontSize * 3);
+          const stepX = textW * mult;
+          const stepY = baseFontSize * (mult * 2.2);
+
+          const diag = Math.hypot(photoRect.w, photoRect.h);
+          const centerX = photoRect.x + photoRect.w / 2;
+          const centerY = photoRect.y + photoRect.h / 2;
+
+          ctx.translate(centerX, centerY);
+          ctx.rotate((-24 * Math.PI) / 180);
+
+          let row = 0;
+          for (let y = -diag; y <= diag; y += stepY) {
+            const offsetX = (row % 2) * (stepX * 0.5);
+            for (let x = -diag; x <= diag; x += stepX) {
+              renderSingleStamp(x + offsetX, y);
+            }
+            row++;
+          }
+        } else {
+          const margin = baseFontSize * 1.4;
+          const minX = photoRect.x + margin;
+          const maxX = Math.max(minX, photoRect.x + photoRect.w - margin);
+          const minY = photoRect.y + margin;
+          const maxY = Math.max(minY, photoRect.y + photoRect.h - margin);
+
+          const cx = minX + (maxX - minX) * state.wmPos.x;
+          const cy = minY + (maxY - minY) * state.wmPos.y;
+          renderSingleStamp(cx, cy);
+        }
+
+        ctx.restore();
+      }
+
+      function renderFramedComposition(targetCanvas, maxDimension = null) {
+        const photo = getActivePhoto();
+        if (!photo) return;
+
+        const origW = photo.img.naturalWidth;
+        const origH = photo.img.naturalHeight;
+        let scale = 1;
+        const safeMax = maxDimension || 3840;
+        if (Math.max(origW, origH) > safeMax) {
+          scale = safeMax / Math.max(origW, origH);
+        }
+
+        const photoW = Math.round(origW * scale);
+        const photoH = Math.round(origH * scale);
+        const baseRef = Math.min(photoW, photoH);
+        const uiScale = baseRef / 1000;
+
+        const pad = Math.round(state.framePad * 1.6 * uiScale);
+        const cornerR = Math.round(state.cornerRadius * 1.6 * uiScale);
+        const layout = state.layout;
+
+        let topPad = pad;
+        let sidePad = pad;
+        let bottomBarH = Math.max(Math.round(135 * uiScale), Math.round(pad * 2.4));
+
+        if (layout === 'gallery') {
+          topPad = Math.round(pad * 1.35);
+          sidePad = Math.round(pad * 1.35);
+          bottomBarH = Math.max(Math.round(175 * uiScale), Math.round(pad * 3.1));
+        } else if (layout === 'blur') {
+          topPad = Math.round(pad * 1.25);
+          sidePad = Math.round(pad * 1.25);
+          bottomBarH = Math.max(Math.round(150 * uiScale), Math.round(pad * 2.6));
+        } else if (layout === 'telemetry') {
+          topPad = Math.max(Math.round(68 * uiScale), Math.round(pad * 1.1));
+          sidePad = Math.max(Math.round(36 * uiScale), Math.round(pad * 0.75));
+          bottomBarH = Math.max(Math.round(125 * uiScale), Math.round(pad * 2.1));
+        }
+
+        const totalW = photoW + sidePad * 2;
+        const totalH = photoH + topPad + bottomBarH;
+
+        targetCanvas.width = totalW;
+        targetCanvas.height = totalH;
+        const ctx = targetCanvas.getContext('2d');
+        ctx.clearRect(0, 0, totalW, totalH);
+
+        if (layout === 'blur') {
+          drawBlurredBackdrop(ctx, photo.img, totalW, totalH);
+        } else {
+          ctx.fillStyle = state.bgColor;
+          ctx.fillRect(0, 0, totalW, totalH);
+        }
+
+        const photoRect = { x: sidePad, y: topPad, w: photoW, h: photoH };
+        if (maxDimension !== null) {
+          lastPhotoRect = photoRect;
+        }
+
+        if (state.showShadow || layout === 'blur') {
+          ctx.save();
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.34)';
+          ctx.shadowBlur = Math.round(36 * uiScale);
+          ctx.shadowOffsetY = Math.round(12 * uiScale);
+          ctx.fillStyle = '#000000';
+          ctx.beginPath();
+          if (cornerR > 0) {
+            ctx.roundRect(photoRect.x, photoRect.y, photoRect.w, photoRect.h, cornerR);
+          } else {
+            ctx.rect(photoRect.x, photoRect.y, photoRect.w, photoRect.h);
+          }
+          ctx.fill();
+          ctx.restore();
+        }
+
+        drawRoundedImage(ctx, photo.img, photoRect.x, photoRect.y, photoRect.w, photoRect.h, cornerR);
+        drawWatermarkOverlay(ctx, photoRect, uiScale);
+
+        const darkBg = layout === 'blur' ? true : isColorDark(state.bgColor);
+        const primaryTextColor = state.exifColor === 'auto'
+          ? (darkBg ? '#f9fafb' : '#111827')
+          : state.exifColor;
+        const secondaryTextColor = state.exifColor === 'auto'
+          ? (darkBg ? 'rgba(243, 244, 246, 0.68)' : '#6b7280')
+          : state.exifColor;
+        const dividerColor = darkBg ? 'rgba(255, 255, 255, 0.24)' : 'rgba(17, 24, 39, 0.16)';
+
+        const fontFamily = layout === 'telemetry' ? FONT_STACKS.mono : FONT_STACKS[state.fontFamily];
+        const fontStyle = state.textCase === 'italic' ? 'italic' : 'normal';
+        const weightMain = state.fontWeight;
+        const weightSub = state.fontWeight === '800' ? '600' : '400';
+        const sizeScale = state.exifSize / 100;
+        const letterSp = Math.round(state.letterSpacing * uiScale);
+
+        const titleSize = Math.max(12, Math.round(32 * uiScale * sizeScale));
+        const paramSize = Math.max(11, Math.round(27 * uiScale * sizeScale));
+        const subSize = Math.max(10, Math.round(22 * uiScale * sizeScale));
+
+        const camTitle = buildCameraTitle(photo.exif);
+        const subLeft = buildSubLeftLine(photo.exif);
+        const paramLine = buildParameterLine(photo.exif);
+        const dateText = state.showDate ? applyTextTransform((photo.exif.date || '').trim()) : '';
+        const activeBrand = resolveCameraBrand(photo.exif);
+
+        const barTop = photoRect.y + photoRect.h;
+        const barCenterY = barTop + bottomBarH / 2;
+
+        ctx.save();
+        ctx.textBaseline = 'middle';
+
+        if (layout === 'gallery') {
+          const centerX = totalW / 2;
+          const logoBaseH = Math.max(24, Math.round(bottomBarH * 0.34));
+          let textCenterY = barCenterY;
+
+          if (activeBrand !== 'none') {
+            drawBrandEmblem(ctx, activeBrand, centerX, barTop + bottomBarH * 0.28, logoBaseH, darkBg, 'center');
+            textCenterY = barTop + bottomBarH * 0.68;
+          }
+
+          const line1 = camTitle || paramLine;
+          const line2 = camTitle
+            ? [paramLine, subLeft, dateText].filter(Boolean).join(state.separator)
+            : [subLeft, dateText].filter(Boolean).join(state.separator);
+
+          if (line1 && line2) {
+            ctx.font = `${fontStyle} ${weightMain} ${titleSize}px ${fontFamily}`;
+            ctx.fillStyle = primaryTextColor;
+            drawTextWithSpacing(ctx, line1, centerX, textCenterY - subSize * 0.82, letterSp, 'center');
+
+            ctx.font = `${fontStyle} ${weightSub} ${subSize}px ${fontFamily}`;
+            ctx.fillStyle = secondaryTextColor;
+            drawTextWithSpacing(ctx, line2, centerX, textCenterY + titleSize * 0.82, letterSp, 'center');
+          } else if (line1) {
+            ctx.font = `${fontStyle} ${weightMain} ${titleSize}px ${fontFamily}`;
+            ctx.fillStyle = primaryTextColor;
+            drawTextWithSpacing(ctx, line1, centerX, textCenterY, letterSp, 'center');
+          }
+        } else if (layout === 'telemetry') {
+          const topCenterY = topPad / 2;
+          ctx.font = `${fontStyle} 700 ${Math.round(subSize * 0.95)}px ${FONT_STACKS.mono}`;
+          ctx.fillStyle = secondaryTextColor;
+
+          let leftTopX = sidePad;
+          if (activeBrand !== 'none') {
+            const logoW = drawBrandEmblem(ctx, activeBrand, leftTopX, topCenterY, Math.max(20, Math.round(topPad * 0.56)), darkBg, 'left');
+            leftTopX += logoW + Math.round(14 * uiScale);
+          }
+
+          const topLeftLabel = camTitle ? `[ ${camTitle} ]` : '[ EXIF FRAME ]';
+          const topRightLabel = subLeft ? `[ ${subLeft} ]` : '';
+          drawTextWithSpacing(ctx, topLeftLabel, leftTopX, topCenterY, letterSp, 'left');
+          if (topRightLabel) {
+            drawTextWithSpacing(ctx, topRightLabel, totalW - sidePad, topCenterY, letterSp, 'right');
+          }
+
+          const bottomText = [paramLine, dateText].filter(Boolean).join('   //   ');
+          if (bottomText) {
+            ctx.font = `${fontStyle} ${weightMain} ${paramSize}px ${FONT_STACKS.mono}`;
+            ctx.fillStyle = primaryTextColor;
+            drawTextWithSpacing(ctx, bottomText, totalW / 2, barCenterY, letterSp, 'center');
+          }
+
+          ctx.strokeStyle = dividerColor;
+          ctx.lineWidth = Math.max(1, 2 * uiScale);
+          const tick = Math.round(14 * uiScale);
+          ctx.beginPath();
+          ctx.moveTo(sidePad, photoRect.y - tick * 0.5);
+          ctx.lineTo(sidePad + tick, photoRect.y - tick * 0.5);
+          ctx.moveTo(totalW - sidePad - tick, photoRect.y - tick * 0.5);
+          ctx.lineTo(totalW - sidePad, photoRect.y - tick * 0.5);
+          ctx.stroke();
+        } else {
+          let leftX = sidePad;
+          const rightX = totalW - sidePad;
+
+          if (activeBrand !== 'none') {
+            const logoH = Math.max(26, Math.round(bottomBarH * 0.44));
+            const renderedLogoW = drawBrandEmblem(ctx, activeBrand, leftX, barCenterY, logoH, darkBg, 'left');
+            if (renderedLogoW > 0) {
+              leftX += renderedLogoW + Math.round(22 * uiScale);
+            }
+          }
+
+          if (camTitle && subLeft) {
+            ctx.font = `${fontStyle} ${weightMain} ${titleSize}px ${fontFamily}`;
+            ctx.fillStyle = primaryTextColor;
+            drawTextWithSpacing(ctx, camTitle, leftX, barCenterY - subSize * 0.72, letterSp, 'left');
+
+            ctx.font = `${fontStyle} ${weightSub} ${subSize}px ${fontFamily}`;
+            ctx.fillStyle = secondaryTextColor;
+            drawTextWithSpacing(ctx, subLeft, leftX, barCenterY + titleSize * 0.72, letterSp, 'left');
+          } else if (camTitle || subLeft) {
+            ctx.font = `${fontStyle} ${weightMain} ${titleSize}px ${fontFamily}`;
+            ctx.fillStyle = primaryTextColor;
+            drawTextWithSpacing(ctx, camTitle || subLeft, leftX, barCenterY, letterSp, 'left');
+          }
+
+          if (paramLine && dateText) {
+            ctx.font = `${fontStyle} ${weightMain} ${paramSize}px ${fontFamily}`;
+            ctx.fillStyle = primaryTextColor;
+            drawTextWithSpacing(ctx, paramLine, rightX, barCenterY - subSize * 0.72, letterSp, 'right');
+
+            ctx.font = `${fontStyle} ${weightSub} ${subSize}px ${fontFamily}`;
+            ctx.fillStyle = secondaryTextColor;
+            drawTextWithSpacing(ctx, dateText, rightX, barCenterY + paramSize * 0.72, letterSp, 'right');
+          } else if (paramLine || dateText) {
+            ctx.font = `${fontStyle} ${weightMain} ${paramSize}px ${fontFamily}`;
+            ctx.fillStyle = primaryTextColor;
+            drawTextWithSpacing(ctx, paramLine || dateText, rightX, barCenterY, letterSp, 'right');
+          }
+
+          if (state.showDivider && (camTitle || subLeft || activeBrand !== 'none') && (paramLine || dateText)) {
+            ctx.font = `${fontStyle} ${weightMain} ${paramSize}px ${fontFamily}`;
+            const rightWidth = Math.max(
+              paramLine ? ctx.measureText(paramLine).width + paramLine.length * letterSp : 0,
+              dateText ? ctx.measureText(dateText).width + dateText.length * letterSp : 0
+            );
+            const divX = rightX - rightWidth - Math.round(28 * uiScale);
+            if (divX > leftX + Math.round(80 * uiScale)) {
+              ctx.strokeStyle = dividerColor;
+              ctx.lineWidth = Math.max(1.5, 2.5 * uiScale);
+              const divH = Math.round(bottomBarH * 0.44);
+              ctx.beginPath();
+              ctx.moveTo(divX, barCenterY - divH / 2);
+              ctx.lineTo(divX, barCenterY + divH / 2);
+              ctx.stroke();
+            }
+          }
+        }
+
+        ctx.restore();
+      }
+
+      function renderPreview() {
+        if (!getActivePhoto()) return;
+        renderFramedComposition(el.previewCanvas, 1280);
+      }
+
+      function renderFullResolutionBlob() {
+        return new Promise((resolve) => {
+          const exportCanvas = document.createElement('canvas');
+          renderFramedComposition(exportCanvas, null);
+          const mime = state.exportFormat === 'png' ? 'image/png' : 'image/jpeg';
+          const quality = state.exportFormat === 'png' ? undefined : 0.96;
+          exportCanvas.toBlob((blob) => {
+            resolve({ blob, canvas: exportCanvas, mime });
+          }, mime, quality);
+        });
+      }
+
+      /* =====================================================================
+       * 8. PREVIEW MODE & HARDWARE BACK BUTTON SUPPORT
+       * ===================================================================*/
+      async function openPreviewMode() {
+        if (!getActivePhoto() || isPreviewOpen) return;
+        const { canvas } = await renderFullResolutionBlob();
+        el.previewFullImage.src = canvas.toDataURL('image/jpeg', 0.92);
+        isPreviewZoomed = false;
+        el.previewViewport.classList.remove('zoomed');
+        el.btnToggleZoom.querySelector('span').textContent = 'Zoom 100%';
+
+        el.previewModal.classList.add('open');
+        el.previewModal.setAttribute('aria-hidden', 'false');
+        isPreviewOpen = true;
+
+        try {
+          if (!history.state || !history.state.exifPreview) {
+            history.pushState({ exifPreview: true }, '');
+          }
+        } catch (e) {}
+      }
+
+      function closePreviewMode(fromPopState = false) {
+        if (!isPreviewOpen) return;
+        el.previewModal.classList.remove('open');
+        el.previewModal.setAttribute('aria-hidden', 'true');
+        isPreviewOpen = false;
+
+        if (!fromPopState) {
+          try {
+            if (history.state && history.state.exifPreview) {
+              history.back();
+            }
+          } catch (e) {}
+        }
+      }
+
+      window.addEventListener('popstate', () => {
+        if (isPreviewOpen) {
+          closePreviewMode(true);
+        } else if (isShareModalOpen) {
+          closeShareModal();
+        }
+      });
+
+      window.handleAndroidBackPress = function () {
+        if (isPreviewOpen) {
+          closePreviewMode(false);
+          return true;
+        }
+        if (isShareModalOpen) {
+          closeShareModal();
+          return true;
+        }
+        return false;
+      };
+
+      /* =====================================================================
+       * 9. SAVE TO ANDROID GALLERY & SHARE HANDLERS
+       * ===================================================================*/
+      function triggerBrowserDownload(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }
+
+      async function saveCurrentPhoto() {
+        const photo = getActivePhoto();
+        if (!photo) return;
+        showToast('Menyimpan ke Galeri...');
+        const { blob, canvas, mime } = await renderFullResolutionBlob();
+        const ext = state.exportFormat === 'png' ? 'png' : 'jpg';
+        const filename = `${photo.name}-exif.${ext}`;
+        const dataUrl = canvas.toDataURL(mime, 0.96);
+
+        // 1. Native Android APK MediaStore Bridge (100% langsung masuk Galeri HP)
+        if (window.AndroidBridge && typeof window.AndroidBridge.saveImage === 'function') {
+          window.AndroidBridge.saveImage(dataUrl, filename);
+          return;
+        }
+
+        // 2. Browser / Web Fallback
+        lastExportPayload = { blob, dataUrl, filename, mime };
+        triggerBrowserDownload(blob, filename);
+        showToast(`Disimpan: ${filename}`);
+      }
+
+      function openShareModal(payload, mode = 'share') {
+        lastExportPayload = payload;
+        el.sharePreviewImg.src = payload.dataUrl;
+        el.sheetModalTitle.textContent = mode === 'save' ? 'Simpan ke Galeri HP' : 'Bagikan Foto';
+        el.shareModal.classList.add('open');
+        el.shareModal.setAttribute('aria-hidden', 'false');
+        isShareModalOpen = true;
+      }
+
+      function closeShareModal() {
+        el.shareModal.classList.remove('open');
+        el.shareModal.setAttribute('aria-hidden', 'true');
+        isShareModalOpen = false;
+      }
+
+      async function executeNativeFileShare(payload) {
+        if (!payload) return false;
+        try {
+          const file = new File([payload.blob], payload.filename, { type: payload.mime });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: payload.filename
+            });
+            return true;
+          }
+        } catch (err) {
+          if (err && err.name === 'AbortError') return true;
+        }
+        return false;
+      }
+
+      async function shareCurrentPhoto() {
+        const photo = getActivePhoto();
+        if (!photo) return;
+
+        showToast('Menyiapkan foto...');
+        const { blob, canvas, mime } = await renderFullResolutionBlob();
+        const ext = state.exportFormat === 'png' ? 'png' : 'jpg';
+        const filename = `${photo.name}-exif.${ext}`;
+        const dataUrl = canvas.toDataURL(mime, 0.96);
+
+        // 1. Native Android APK FileProvider Share Intent
+        if (window.AndroidBridge && typeof window.AndroidBridge.shareImage === 'function') {
+          window.AndroidBridge.shareImage(dataUrl, filename);
+          return;
+        }
+
+        // 2. Web Share API / Modal Fallback
+        const payload = { blob, dataUrl, filename, mime };
+        lastExportPayload = payload;
+        const shared = await executeNativeFileShare(payload);
+        if (!shared) {
+          openShareModal(payload, 'share');
+        }
+      }
+
+      /* =====================================================================
+       * 10. EVENT LISTENERS & INTERACTIONS
+       * ===================================================================*/
+      el.emptyDropBox.addEventListener('click', () => el.fileInput.click());
+      el.btnAddPhoto.addEventListener('click', () => el.fileInput.click());
+      el.fileInput.addEventListener('change', (e) => {
+        handleFilesSelected(e.target.files);
+        e.target.value = '';
+      });
+
+      el.previewCanvas.addEventListener('pointerdown', (e) => {
+        if (!getActivePhoto()) return;
+        pointerDownPos = { x: e.clientX, y: e.clientY };
+        pointerMoved = false;
+
+        if (state.wmEnabled && !state.wmTiled) {
+          const rect = el.previewCanvas.getBoundingClientRect();
+          const scaleX = el.previewCanvas.width / rect.width;
+          const scaleY = el.previewCanvas.height / rect.height;
+          const cx = (e.clientX - rect.left) * scaleX;
+          const cy = (e.clientY - rect.top) * scaleY;
+
+          if (
+            cx >= lastPhotoRect.x &&
+            cx <= lastPhotoRect.x + lastPhotoRect.w &&
+            cy >= lastPhotoRect.y &&
+            cy <= lastPhotoRect.y + lastPhotoRect.h
+          ) {
+            isDraggingWm = true;
+            el.previewCanvas.setPointerCapture(e.pointerId);
+          }
+        }
+      });
+
+      el.previewCanvas.addEventListener('pointermove', (e) => {
+        if (!pointerDownPos) return;
+        const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+        if (dist > 6) {
+          pointerMoved = true;
+        }
+
+        if (isDraggingWm && pointerMoved) {
+          const rect = el.previewCanvas.getBoundingClientRect();
+          const scaleX = el.previewCanvas.width / rect.width;
+          const scaleY = el.previewCanvas.height / rect.height;
+          const cx = (e.clientX - rect.left) * scaleX;
+          const cy = (e.clientY - rect.top) * scaleY;
+
+          const nx = Math.max(0, Math.min(1, (cx - lastPhotoRect.x) / Math.max(1, lastPhotoRect.w)));
+          const ny = Math.max(0, Math.min(1, (cy - lastPhotoRect.y) / Math.max(1, lastPhotoRect.h)));
+          state.wmPos = { x: nx, y: ny };
+          el.wmPosGrid.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
+          renderPreview();
+        }
+      });
+
+      el.previewCanvas.addEventListener('pointerup', (e) => {
+        if (isDraggingWm) {
+          isDraggingWm = false;
+          try { el.previewCanvas.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
+        if (pointerDownPos && !pointerMoved) {
+          openPreviewMode();
+        }
+        pointerDownPos = null;
+      });
+
+      el.previewCanvas.addEventListener('pointercancel', () => {
+        isDraggingWm = false;
+        pointerDownPos = null;
+      });
+
+      el.btnClosePreview.addEventListener('click', () => closePreviewMode(false));
+      el.btnToggleZoom.addEventListener('click', () => {
+        isPreviewZoomed = !isPreviewZoomed;
+        el.previewViewport.classList.toggle('zoomed', isPreviewZoomed);
+        el.btnToggleZoom.querySelector('span').textContent = isPreviewZoomed ? 'Pas Layar' : 'Zoom 100%';
+      });
+      el.btnPreviewShare.addEventListener('click', shareCurrentPhoto);
+      el.btnPreviewSave.addEventListener('click', saveCurrentPhoto);
+
+      el.btnShare.addEventListener('click', shareCurrentPhoto);
+      el.btnSave.addEventListener('click', saveCurrentPhoto);
+
+      el.btnCloseShareModal.addEventListener('click', closeShareModal);
+      el.shareModal.addEventListener('click', (e) => {
+        if (e.target === el.shareModal) closeShareModal();
+      });
+
+      el.btnNativeShareRetry.addEventListener('click', async () => {
+        if (!lastExportPayload) return;
+        const ok = await executeNativeFileShare(lastExportPayload);
+        if (!ok) {
+          showToast('Tekan & tahan gambar di atas lalu pilih Simpan gambar');
+        }
+      });
+
+      el.btnCopyCaption.addEventListener('click', async () => {
+        const text = buildCaptionSummary();
+        if (!text) {
+          showToast('Data EXIF masih kosong');
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(text);
+          showToast('Teks EXIF disalin');
+        } catch (err) {
+          showToast(text);
+        }
+      });
+
+      el.btnDownloadFromShare.addEventListener('click', () => {
+        if (lastExportPayload) {
+          triggerBrowserDownload(lastExportPayload.blob, lastExportPayload.filename);
+          showToast(`Mengunduh ${lastExportPayload.filename}`);
+        }
+        closeShareModal();
+      });
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.tab;
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${target}`));
+        });
+      });
+
+      // TAB 1: Bingkai
+      el.layoutChoices.addEventListener('click', (e) => {
+        const btn = e.target.closest('.choice-btn');
+        if (!btn) return;
+        el.layoutChoices.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.layout = btn.dataset.layout;
+        renderPreview();
+      });
+
+      el.rangeFramePad.addEventListener('input', () => {
+        state.framePad = Number(el.rangeFramePad.value);
+        el.valFramePad.textContent = `${state.framePad} px`;
+        renderPreview();
+      });
+
+      el.rangeCornerRadius.addEventListener('input', () => {
+        state.cornerRadius = Number(el.rangeCornerRadius.value);
+        el.valCornerRadius.textContent = `${state.cornerRadius} px`;
+        renderPreview();
+      });
+
+      el.bgSwatches.addEventListener('click', (e) => {
+        const btn = e.target.closest('.swatch-btn');
+        if (!btn) return;
+        el.bgSwatches.querySelectorAll('.swatch-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.bgColor = btn.dataset.bg;
+        renderPreview();
+      });
+
+      el.bgColorPicker.addEventListener('input', () => {
+        el.bgSwatches.querySelectorAll('.swatch-btn').forEach(b => b.classList.remove('active'));
+        state.bgColor = el.bgColorPicker.value;
+        el.customBgDot.style.background = state.bgColor;
+        renderPreview();
+      });
+
+      // TAB 2: EXIF
+      el.sepChoices.addEventListener('click', (e) => {
+        const btn = e.target.closest('.sep-btn');
+        if (!btn) return;
+        el.sepChoices.querySelectorAll('.sep-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        el.customSepInput.value = '';
+        state.separator = btn.dataset.sep;
+        renderPreview();
+      });
+
+      el.customSepInput.addEventListener('input', () => {
+        const val = el.customSepInput.value;
+        if (val.length > 0) {
+          el.sepChoices.querySelectorAll('.sep-btn').forEach(b => b.classList.remove('active'));
+          state.separator = ` ${val} `;
+          renderPreview();
+        }
+      });
+
+      el.toggleFreeParam.addEventListener('change', () => {
+        state.useFreeParam = el.toggleFreeParam.checked;
+        el.freeParamWrap.style.display = state.useFreeParam ? 'flex' : 'none';
+        if (state.useFreeParam && !el.inputFreeParam.value && getActivePhoto()) {
+          const p = getActivePhoto();
+          const autoLine = [p.exif.focal, p.exif.aperture, p.exif.shutter, p.exif.iso].filter(Boolean).join(state.separator);
+          el.inputFreeParam.value = autoLine;
+          state.freeParamText = autoLine;
+        }
+        renderPreview();
+      });
+
+      el.inputFreeParam.addEventListener('input', () => {
+        state.freeParamText = el.inputFreeParam.value;
+        renderPreview();
+      });
+
+      const exifFieldMap = [
+        ['exifMake', 'make'],
+        ['exifModel', 'model'],
+        ['exifLens', 'lens'],
+        ['exifFocal', 'focal'],
+        ['exifAperture', 'aperture'],
+        ['exifShutter', 'shutter'],
+        ['exifIso', 'iso'],
+        ['exifDate', 'date'],
+        ['exifCredit', 'credit']
+      ];
+
+      exifFieldMap.forEach(([elId, key]) => {
+        el[elId].addEventListener('input', () => {
+          const p = getActivePhoto();
+          if (!p) return;
+          p.exif[key] = el[elId].value;
+          renderPreview();
+        });
+      });
+
+      el.btnClearExif.addEventListener('click', () => {
+        const p = getActivePhoto();
+        if (!p) return;
+        Object.keys(p.exif).forEach(k => { p.exif[k] = ''; });
+        el.inputFreeParam.value = '';
+        state.freeParamText = '';
+        syncExifInputsFromState();
+        renderPreview();
+        showToast('Data EXIF dikosongkan');
+      });
+
+      el.btnResetExif.addEventListener('click', () => {
+        const p = getActivePhoto();
+        if (!p) return;
+        p.exif = { ...p.originalExif };
+        syncExifInputsFromState();
+        renderPreview();
+        showToast('Data EXIF dikembalikan ke asli');
+      });
+
+      // TAB 3: Watermark
+      el.toggleWatermark.addEventListener('change', () => {
+        state.wmEnabled = el.toggleWatermark.checked;
+        renderPreview();
+      });
+
+      el.wmTextInput.addEventListener('input', () => {
+        state.wmText = el.wmTextInput.value;
+        renderPreview();
+      });
+
+      el.wmStyleChoices.addEventListener('click', (e) => {
+        const btn = e.target.closest('.choice-btn');
+        if (!btn) return;
+        el.wmStyleChoices.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.wmStyle = btn.dataset.wmstyle;
+        renderPreview();
+      });
+
+      el.wmColorSwatches.addEventListener('click', (e) => {
+        const btn = e.target.closest('.swatch-btn');
+        if (!btn) return;
+        el.wmColorSwatches.querySelectorAll('.swatch-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.wmColor = btn.dataset.wmcolor;
+        renderPreview();
+      });
+
+      el.wmColorPicker.addEventListener('input', () => {
+        el.wmColorSwatches.querySelectorAll('.swatch-btn').forEach(b => b.classList.remove('active'));
+        state.wmColor = el.wmColorPicker.value;
+        el.customWmDot.style.background = state.wmColor;
+        renderPreview();
+      });
+
+      el.rangeWmSize.addEventListener('input', () => {
+        state.wmSize = Number(el.rangeWmSize.value);
+        el.valWmSize.textContent = `${state.wmSize}%`;
+        renderPreview();
+      });
+
+      el.rangeWmOpacity.addEventListener('input', () => {
+        state.wmOpacity = Number(el.rangeWmOpacity.value);
+        el.valWmOpacity.textContent = `${state.wmOpacity}%`;
+        renderPreview();
+      });
+
+      el.toggleWmTiled.addEventListener('change', () => {
+        state.wmTiled = el.toggleWmTiled.checked;
+        el.wmTileControls.style.display = state.wmTiled ? 'flex' : 'none';
+        el.wmPositionControls.style.display = state.wmTiled ? 'none' : 'flex';
+        renderPreview();
+      });
+
+      el.rangeWmDensity.addEventListener('input', () => {
+        state.wmDensity = Number(el.rangeWmDensity.value);
+        const labels = { 1: 'Jarang (1)', 2: 'Renggang (2)', 3: 'Sedang (3)', 4: 'Rapat (4)', 5: 'Sangat Rapat (5)' };
+        el.valWmDensity.textContent = labels[state.wmDensity] || 'Sedang (3)';
+        renderPreview();
+      });
+
+      el.wmPosGrid.addEventListener('click', (e) => {
+        const btn = e.target.closest('.pos-btn');
+        if (!btn) return;
+        el.wmPosGrid.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.wmPos = {
+          x: parseFloat(btn.dataset.px),
+          y: parseFloat(btn.dataset.py)
+        };
+        renderPreview();
+      });
+
+      // TAB 4: Gaya & Logo (Collapsible)
+      el.btnToggleLogoDrawer.addEventListener('click', () => {
+        const isOpen = el.logoDrawerBody.classList.toggle('open');
+        el.btnToggleLogoDrawer.setAttribute('aria-expanded', String(isOpen));
+      });
+
+      el.brandLogoChoices.addEventListener('click', (e) => {
+        const chip = e.target.closest('.brand-chip');
+        if (!chip) return;
+        el.brandLogoChoices.querySelectorAll('.brand-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        state.brandLogo = chip.dataset.brand;
+        el.activeBrandLabel.textContent = chip.dataset.label || chip.textContent.trim();
+        renderPreview();
+      });
+
+      el.rangeLogoSize.addEventListener('input', () => {
+        state.logoSize = Number(el.rangeLogoSize.value);
+        el.valLogoSize.textContent = `${state.logoSize}%`;
+        renderPreview();
+      });
+
+      el.fontChoices.addEventListener('click', (e) => {
+        const btn = e.target.closest('.choice-btn');
+        if (!btn) return;
+        el.fontChoices.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.fontFamily = btn.dataset.font;
+        renderPreview();
+      });
+
+      el.rangeExifSize.addEventListener('input', () => {
+        state.exifSize = Number(el.rangeExifSize.value);
+        el.valExifSize.textContent = `${state.exifSize}%`;
+        renderPreview();
+      });
+
+      el.rangeLetterSpacing.addEventListener('input', () => {
+        state.letterSpacing = Number(el.rangeLetterSpacing.value);
+        el.valLetterSpacing.textContent = `${state.letterSpacing} px`;
+        renderPreview();
+      });
+
+      el.weightChoices.addEventListener('click', (e) => {
+        const btn = e.target.closest('.choice-btn');
+        if (!btn) return;
+        el.weightChoices.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.fontWeight = btn.dataset.weight;
+        renderPreview();
+      });
+
+      el.caseChoices.addEventListener('click', (e) => {
+        const btn = e.target.closest('.choice-btn');
+        if (!btn) return;
+        el.caseChoices.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.textCase = btn.dataset.case;
+        renderPreview();
+      });
+
+      el.exifColorSwatches.addEventListener('click', (e) => {
+        const btn = e.target.closest('.swatch-btn');
+        if (!btn) return;
+        el.exifColorSwatches.querySelectorAll('.swatch-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.exifColor = btn.dataset.exifcolor;
+        renderPreview();
+      });
+
+      el.exifColorPicker.addEventListener('input', () => {
+        el.exifColorSwatches.querySelectorAll('.swatch-btn').forEach(b => b.classList.remove('active'));
+        state.exifColor = el.exifColorPicker.value;
+        el.customExifDot.style.background = state.exifColor;
+        renderPreview();
+      });
+
+      el.toggleLens.addEventListener('change', () => {
+        state.showLens = el.toggleLens.checked;
+        renderPreview();
+      });
+
+      el.toggleDate.addEventListener('change', () => {
+        state.showDate = el.toggleDate.checked;
+        renderPreview();
+      });
+
+      el.toggleDivider.addEventListener('change', () => {
+        state.showDivider = el.toggleDivider.checked;
+        renderPreview();
+      });
+
+      el.toggleShadow.addEventListener('change', () => {
+        state.showShadow = el.toggleShadow.checked;
+        renderPreview();
+      });
+
+      el.formatChoices.addEventListener('click', (e) => {
+        const btn = e.target.closest('.choice-btn');
+        if (!btn) return;
+        el.formatChoices.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.exportFormat = btn.dataset.format;
+      });
+    })();
+  </script>
+</body>
+</html>
