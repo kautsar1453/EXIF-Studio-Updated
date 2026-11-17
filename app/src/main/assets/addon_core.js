@@ -5,7 +5,7 @@ const E=window.__efs=window.__efs||{mode:'frame',img:null,exif:'',free:{bg:'#fff
 const css=document.createElement('style');
 css.textContent=`
 body{padding-top:56px!important}
-#lr-hud{position:fixed;inset:0;z-index:2147483647;background:rgba(9,9,11,.72);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+#lr-hud{position:fixed;inset:0;z-index:2147483647;background:rgba(9,9,11,.72);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 #lr-hud.on{display:flex}
 #lr-box{width:min(240px,75vw);background:rgba(24,24,27,.98);border:1px solid rgba(255,255,255,.15);border-radius:18px;padding:20px 18px 18px;box-shadow:0 24px 48px rgba(0,0,0,.6);color:#fff;text-align:center}
 .lr-rw{width:44px;height:44px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center}
@@ -173,21 +173,33 @@ function canvasToSafeJpeg(c){
     const tx=t.getContext('2d');tx.imageSmoothingEnabled=true;tx.imageSmoothingQuality='high';
     tx.drawImage(c,0,0,t.width,t.height);src=t;
   }
-  let u=src.toDataURL('image/jpeg',0.92);
-  if(u.length>1500000)u=src.toDataURL('image/jpeg',0.84);
-  if(u.length>1800000){
+  let u=src.toDataURL('image/jpeg',0.95);
+  if(u.length>2400000)u=src.toDataURL('image/jpeg',0.88);
+  if(u.length>2800000){
     const t=document.createElement('canvas');t.__isInternal=true;
     t.width=Math.round(src.width*0.75);t.height=Math.round(src.height*0.75);
     t.getContext('2d').drawImage(src,0,0,t.width,t.height);
-    u=t.toDataURL('image/jpeg',0.84);
+    u=t.toDataURL('image/jpeg',0.86);
   }
   return u;
 }
 E.canvasToSafeJpeg=canvasToSafeJpeg;
 
 let saveHandled=false;
-const origAClick=HTMLAnchorElement.prototype.click;
+let origSaveBase64=null;
+if(window.AndroidGallery&&typeof window.AndroidGallery.saveBase64Image==='function'){
+  origSaveBase64=window.AndroidGallery.saveBase64Image.bind(window.AndroidGallery);
+  try{
+    window.AndroidGallery.saveBase64Image=(u,n)=>{
+      saveHandled=true;
+      const id='s_'+Date.now();showHud('Menyimpan...');
+      if(window.AndroidGallery.saveBase64ImageWithId)window.AndroidGallery.saveBase64ImageWithId(u,n||('EXIF_'+Date.now()+'.jpg'),id);
+      else{origSaveBase64(u,n||('EXIF_'+Date.now()+'.jpg'));setTimeout(()=>window.__onGallerySaveFinished(id,true),650);}
+    };
+  }catch(_){}
+}
 
+const origAClick=HTMLAnchorElement.prototype.click;
 function nativeAnchorDownload(url,name){
   const a=document.createElement('a');
   a.href=url;a.download=name||'EXIF_'+Date.now()+'.jpg';a.style.display='none';
@@ -214,6 +226,11 @@ async function saveImageToGallery(url,fileName){
     if(g){
       if(typeof g.saveBase64ImageWithId==='function'){
         g.saveBase64ImageWithId(dataUrl,name,id);
+        return true;
+      }
+      if(origSaveBase64){
+        origSaveBase64(dataUrl,name);
+        setTimeout(()=>window.__onGallerySaveFinished(id,true),650);
         return true;
       }
       if(typeof g.saveBase64Image==='function'){
@@ -249,23 +266,20 @@ async function saveBatchToGallery(items){
     return;
   }
   const json=JSON.stringify(items);
-  if(typeof g.saveBatchBase64Images==='function'&&json.length<1400000){
+  if(typeof g.saveBatchBase64Images==='function'){
     try{g.saveBatchBase64Images(json,id);return;}
     catch(_){try{g.saveBatchBase64Images(json);setTimeout(()=>window.__onGallerySaveFinished(id,true),800);return;}catch(__){}}
   }
-  if(typeof g.saveBase64ImageWithId==='function'||typeof g.saveBase64Image==='function'){
+  if(typeof g.saveBase64ImageWithId==='function'||origSaveBase64||typeof g.saveBase64Image==='function'){
     for(let i=0;i<items.length;i++){
       window.__onGallerySaveProgress(id,i+1,items.length);
       const subId=id+'_'+i;
       if(typeof g.saveBase64ImageWithId==='function')g.saveBase64ImageWithId(items[i].dataUrl,items[i].fileName,subId);
+      else if(origSaveBase64)origSaveBase64(items[i].dataUrl,items[i].fileName);
       else g.saveBase64Image(items[i].dataUrl,items[i].fileName);
       await new Promise(r=>setTimeout(r,260));
     }
     window.__onGallerySaveFinished(id,true);
-    return;
-  }
-  if(typeof g.saveBatchBase64Images==='function'){
-    try{g.saveBatchBase64Images(json,id);}catch(_){g.saveBatchBase64Images(json);setTimeout(()=>window.__onGallerySaveFinished(id,true),800);}
     return;
   }
   window.__onGallerySaveFinished(id,false);
@@ -381,14 +395,6 @@ navigator.share=async d=>{
 
 const btnLbl=b=>((b.innerText||'')+' '+(b.getAttribute('aria-label')||'')+' '+(b.getAttribute('title')||'')+' '+(b.id||'')+' '+(typeof b.className==='string'?b.className:'')).toLowerCase();
 
-['touchstart','pointerdown'].forEach(ev=>{
-  document.addEventListener(ev,e=>{
-    const b=e.target.closest('button,a,[role="button"]');
-    if(!b||b.closest('#efs-bar,#efs-fpanel,#efs-pv'))return;
-    if(/\b(simpan|save|download|unduh|export)\b/.test(btnLbl(b)))showHud('Menyimpan...');
-  },true);
-});
-
 document.addEventListener('click',e=>{
   const b=e.target.closest('button,a,[role="button"]');
   if(!b||b.closest('#ig-mod,#efs-bar,#efs-fpanel,#efs-pv'))return;
@@ -414,7 +420,7 @@ document.addEventListener('click',e=>{
           const c=E.getNativeCanvas();
           if(c)saveImageToGallery(canvasToSafeJpeg(c),'EXIF_'+Date.now()+'.jpg');
         }
-      },750);
+      },800);
     }
     return;
   }
