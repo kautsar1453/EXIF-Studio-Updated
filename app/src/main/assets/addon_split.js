@@ -58,7 +58,8 @@ function sliceUrls(){
   for(let i=0;i<n;i++){
     const sx=i*bw,sw=(i===n-1)?(tw-sx):bw,c=document.createElement('canvas');c.__isInternal=true;c.width=sw;c.height=th;
     const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(p,sx,0,sw,th,0,0,sw,th);
-    out.push({dataUrl:c.toDataURL('image/jpeg',0.95),fileName:'EXIF_IG_'+(i+1)+'of'+n+'_'+st+'.jpg'});
+    const dataUrl=E.canvasToSafeJpeg?E.canvasToSafeJpeg(c):c.toDataURL('image/jpeg',0.92);
+    out.push({dataUrl,fileName:'EXIF_IG_'+(i+1)+'of'+n+'_'+st+'.jpg'});
   }
   return out;
 }
@@ -83,9 +84,13 @@ function initSplit(){
   ['touchstart','pointerdown'].forEach(ev=>document.getElementById('ig-svb').addEventListener(ev,()=>E.showHud&&E.showHud('Menyimpan...')));
   document.getElementById('ig-svb').addEventListener('click',()=>{
     spMod.classList.remove('on');E.showHud&&E.showHud('Menyimpan...');
-    const sl=sliceUrls(),id='sp_'+Date.now();
-    if(sl.length&&window.AndroidGallery&&window.AndroidGallery.saveBatchBase64Images)window.AndroidGallery.saveBatchBase64Images(JSON.stringify(sl),id);
-    else window.__onGallerySaveFinished(id,false);
+    const sl=sliceUrls();
+    if(E.saveBatchToGallery)E.saveBatchToGallery(sl);
+    else{
+      const id='sp_'+Date.now();
+      if(sl.length&&window.AndroidGallery&&window.AndroidGallery.saveBatchBase64Images)window.AndroidGallery.saveBatchBase64Images(JSON.stringify(sl),id);
+      else window.__onGallerySaveFinished(id,false);
+    }
   });
   document.getElementById('ig-shb').addEventListener('click',()=>{
     const sl=sliceUrls();if(!sl.length)return;spMod.classList.remove('on');
