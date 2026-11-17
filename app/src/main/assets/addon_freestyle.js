@@ -1,6 +1,6 @@
 (function(){
 if(window.__efsFree)return;window.__efsFree=true;
-const E=window.__efs=window.__efs||{mode:'frame',img:null,exif:'',free:{bg:'#ffffff',blur:false,pad:8,rad:0,wm:'bottom-center',ox:0,oy:0,txt:''},split:{n:3,ar:'original'},pv:{open:false,s:1,x:0,y:0}};
+const E=window.__efs=window.__efs||{mode:'frame',img:null,exif:'',free:{bg:'#ffffff',blur:false,pad:8,rad:0,wm:'bottom-center',ox:0,oy:0,txt:''},split:{n:3,ar:'original',wm:'follow'},pv:{open:false,s:1,x:0,y:0}};
 
 const css=document.createElement('style');
 css.textContent=`
@@ -14,17 +14,19 @@ css.textContent=`
 #efs-ccanvas{max-width:100%;max-height:54vh;width:auto;height:auto;border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.45);touch-action:none}
 #efs-fpanel{display:none;width:100%;max-width:540px;margin:8px auto 14px;background:#18181b;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:13px 14px;box-sizing:border-box;color:#fafafa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 #efs-fpanel.on{display:block}
+#efs-fpanel.noframe-mode .efs-frame-only{display:none}
 .efs-row{margin-bottom:13px}.efs-row:last-child{margin-bottom:0}
-.efs-hd{display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;color:#d4d4d8;margin-bottom:6px}
+.efs-hd{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:600;color:#d4d4d8;margin-bottom:6px}
+.efs-rst{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:#fbbf24;font-size:11px;font-weight:600;padding:3px 8px;border-radius:7px;cursor:pointer}
 .efs-sws{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .efs-sw{width:38px;height:38px;border-radius:10px;border:2px solid rgba(255,255,255,.2);cursor:pointer;padding:0;font-size:10.5px;font-weight:700;color:#fff}
 .efs-sw.on{border-color:#f59e0b;transform:scale(1.07)}
 .efs-sl{width:100%;accent-color:#f59e0b;height:26px}
 .efs-inp{width:100%;height:42px;border-radius:10px;border:1px solid rgba(255,255,255,.16);background:#09090b;color:#fafafa;padding:0 12px;font-size:13.5px;box-sizing:border-box}
 .efs-wmg{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-.efs-wmb{min-height:52px;padding:10px 12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:#27272a;color:#e4e4e7;font-size:13.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.efs-wmb{min-height:50px;padding:9px 10px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:#27272a;color:#e4e4e7;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
 .efs-wmb.on{background:rgba(245,158,11,.22);border-color:#f59e0b;color:#fbbf24}
-.efs-wmb svg{width:22px;height:22px;flex-shrink:0}
+.efs-wmb svg{width:20px;height:20px;flex-shrink:0}
 .efs-big-wm{min-height:50px!important;min-width:68px!important;padding:10px 14px!important;font-size:13.5px!important;border-radius:12px!important}
 .efs-big-wm svg{width:22px!important;height:22px!important}
 `;
@@ -97,14 +99,43 @@ function getExifFallback(){
   }
   return '';
 }
+E.getExifFallback=getExifFallback;
 
-function drawCustom(){
-  const cc=document.getElementById('efs-ccanvas');if(!cc)return null;
+function renderCanvas(includeWm){
+  const cc=document.getElementById('efs-ccanvas')||document.createElement('canvas');
   const im=getOrigImg();
-  if(!im){const nc=E.getNativeCanvas&&E.getNativeCanvas();if(nc){cc.width=nc.width;cc.height=nc.height;cc.getContext('2d').drawImage(nc,0,0);}return cc;}
-  const iw=im.naturalWidth,ih=im.naturalHeight;
-  if(E.mode==='noframe'){cc.width=iw;cc.height=ih;const x=cc.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(im,0,0,iw,ih);return cc;}
-  const f=E.free,bd=Math.max(iw,ih),pad=Math.round(bd*(f.pad/100));
+  if(!im){
+    const nc=E.getNativeCanvas&&E.getNativeCanvas();
+    if(nc){cc.width=nc.width;cc.height=nc.height;cc.getContext('2d').drawImage(nc,0,0);}
+    return cc;
+  }
+  const iw=im.naturalWidth,ih=im.naturalHeight,bd=Math.max(iw,ih),f=E.free;
+  const wt=(f.txt||getExifFallback()||'').trim();
+
+  if(E.mode==='noframe'){
+    cc.width=iw;cc.height=ih;
+    const x=cc.getContext('2d');
+    x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';
+    x.drawImage(im,0,0,iw,ih);
+    if(includeWm&&f.wm!=='none'&&wt){
+      const fs=Math.max(20,Math.round(bd*0.022));
+      x.save();
+      x.font='600 '+fs+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+      x.textBaseline='middle';
+      x.fillStyle='#ffffff';
+      x.shadowColor='rgba(0,0,0,.82)';
+      x.shadowBlur=Math.round(fs*0.55);
+      x.shadowOffsetY=Math.max(1,Math.round(fs*0.08));
+      let bx=iw/2,by=ih-Math.round(fs*1.65);
+      if(f.wm==='bottom-left'){x.textAlign='left';bx=Math.max(18,Math.round(bd*0.028));}
+      else x.textAlign='center';
+      x.fillText(wt,bx+f.ox,by+f.oy);
+      x.restore();
+    }
+    return cc;
+  }
+
+  const pad=Math.round(bd*(f.pad/100));
   const bot=(f.wm==='bottom-center'||f.wm==='bottom-left')?Math.max(pad,Math.round(bd*0.065)):pad;
   const cw=iw+pad*2,ch=ih+pad+bot;
   cc.width=cw;cc.height=ch;
@@ -124,8 +155,7 @@ function drawCustom(){
     x.fillStyle='#000';x.fill();x.shadowColor='transparent';x.clip();
   }
   x.drawImage(im,pad,pad,iw,ih);x.restore();
-  const wt=(f.txt||getExifFallback()||'').trim();
-  if(f.wm!=='none'&&wt){
+  if(includeWm&&f.wm!=='none'&&wt){
     const fs=Math.max(20,Math.round(bd*0.021));
     x.save();x.font='600 '+fs+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';x.textBaseline='middle';
     const dark=!f.blur&&(f.bg==='#09090b'||f.bg==='#18181b'||f.bg==='#000000');
@@ -140,7 +170,19 @@ function drawCustom(){
   }
   return cc;
 }
+
+function drawCustom(){return renderCanvas(true);}
 E.drawCustom=drawCustom;
+E.getCleanCanvas=()=>{
+  if(E.mode==='frame')return E.getNativeCanvas&&E.getNativeCanvas();
+  const src=renderCanvas(false);
+  if(!src)return null;
+  const copy=document.createElement('canvas');
+  copy.width=src.width;copy.height=src.height;
+  copy.getContext('2d').drawImage(src,0,0);
+  drawCustom();
+  return copy;
+};
 
 const bar=document.createElement('div');
 bar.id='efs-bar';
@@ -148,7 +190,7 @@ bar.innerHTML='<div class="efs-grp"><button type="button" class="efs-mbtn on" da
 
 const cwrap=document.createElement('div');cwrap.id='efs-cwrap';cwrap.innerHTML='<canvas id="efs-ccanvas"></canvas>';
 const fpanel=document.createElement('div');fpanel.id='efs-fpanel';
-fpanel.innerHTML='<div class="efs-row"><div class="efs-hd"><span>Latar</span></div><div class="efs-sws" id="efs-sws"><button type="button" class="efs-sw on" data-b="#ffffff" style="background:#fff;color:#000"></button><button type="button" class="efs-sw" data-b="#09090b" style="background:#09090b"></button><button type="button" class="efs-sw" data-b="#27272a" style="background:#27272a"></button><button type="button" class="efs-sw" data-b="#f5f5f4" style="background:#f5f5f4"></button><button type="button" class="efs-sw" data-b="blur" style="background:linear-gradient(135deg,#38bdf8,#f59e0b)">Blur</button><input type="color" id="efs-cp" value="#ffffff" style="width:38px;height:38px;border:none;background:none;padding:0"/></div></div><div class="efs-row"><div class="efs-hd"><span>Jarak Tepi</span><span id="efs-pv2">8%</span></div><input type="range" class="efs-sl" id="efs-ps" min="0" max="24" value="8"/></div><div class="efs-row"><div class="efs-hd"><span>Sudut Foto</span><span id="efs-rv">0</span></div><input type="range" class="efs-sl" id="efs-rs" min="0" max="40" value="0"/></div><div class="efs-row"><div class="efs-hd"><span>Tata Letak Watermark</span></div><div class="efs-wmg" id="efs-wmg"><button type="button" class="efs-wmb on" data-w="bottom-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="18" x2="16" y2="18"/></svg><span>Bawah Tengah</span></button><button type="button" class="efs-wmb" data-w="bottom-left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="6" y1="18" x2="13" y2="18"/></svg><span>Bawah Kiri</span></button><button type="button" class="efs-wmb" data-w="inside-bottom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="15" x2="16" y2="15"/></svg><span>Dalam Foto</span></button><button type="button" class="efs-wmb" data-w="none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="5" y1="5" x2="19" y2="19"/></svg><span>Sembunyi</span></button></div></div><div class="efs-row"><input type="text" class="efs-inp" id="efs-wt" placeholder="Teks EXIF (geser posisi di foto)"/></div>';
+fpanel.innerHTML='<div class="efs-row efs-frame-only"><div class="efs-hd"><span>Latar</span></div><div class="efs-sws" id="efs-sws"><button type="button" class="efs-sw on" data-b="#ffffff" style="background:#fff;color:#000"></button><button type="button" class="efs-sw" data-b="#09090b" style="background:#09090b"></button><button type="button" class="efs-sw" data-b="#27272a" style="background:#27272a"></button><button type="button" class="efs-sw" data-b="#f5f5f4" style="background:#f5f5f4"></button><button type="button" class="efs-sw" data-b="blur" style="background:linear-gradient(135deg,#38bdf8,#f59e0b)">Blur</button><input type="color" id="efs-cp" value="#ffffff" style="width:38px;height:38px;border:none;background:none;padding:0"/></div></div><div class="efs-row efs-frame-only"><div class="efs-hd"><span>Jarak Tepi</span><span id="efs-pv2">8%</span></div><input type="range" class="efs-sl" id="efs-ps" min="0" max="24" value="8"/></div><div class="efs-row efs-frame-only"><div class="efs-hd"><span>Sudut Foto</span><span id="efs-rv">0</span></div><input type="range" class="efs-sl" id="efs-rs" min="0" max="40" value="0"/></div><div class="efs-row"><div class="efs-hd"><span>Tata Letak Watermark</span><button type="button" class="efs-rst" id="efs-wrst">Reset Posisi</button></div><div class="efs-wmg" id="efs-wmg"><button type="button" class="efs-wmb on" data-w="bottom-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="18" x2="16" y2="18"/></svg><span>Bawah Tengah</span></button><button type="button" class="efs-wmb" data-w="bottom-left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="6" y1="18" x2="13" y2="18"/></svg><span>Bawah Kiri</span></button><button type="button" class="efs-wmb efs-frame-only" data-w="inside-bottom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="15" x2="16" y2="15"/></svg><span>Dalam Foto</span></button><button type="button" class="efs-wmb" data-w="none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="5" y1="5" x2="19" y2="19"/></svg><span>Sembunyi</span></button></div></div><div class="efs-row"><input type="text" class="efs-inp" id="efs-wt" placeholder="Teks EXIF (geser posisi langsung di foto)"/></div>';
 
 function syncDom(){
   if(!document.body)return;
@@ -172,7 +214,13 @@ function setMode(m){
   syncDom();
   if(m==='frame'){cwrap.classList.remove('on');fpanel.classList.remove('on');}
   else{
-    cwrap.classList.add('on');fpanel.classList.toggle('on',m==='freestyle');
+    cwrap.classList.add('on');
+    fpanel.classList.add('on');
+    fpanel.classList.toggle('noframe-mode',m==='noframe');
+    if(m==='noframe'&&E.free.wm==='inside-bottom'){
+      E.free.wm='bottom-center';
+      document.querySelectorAll('#efs-wmg .efs-wmb').forEach(x=>x.classList.toggle('on',x.getAttribute('data-w')==='bottom-center'));
+    }
     const ti=document.getElementById('efs-wt');if(ti&&!ti.value){ti.value=E.free.txt||getExifFallback()||'';E.free.txt=ti.value;}
     drawCustom();
   }
@@ -191,7 +239,7 @@ function initFree(){
   document.addEventListener('pointerdown',e=>{
     const m=e.target.closest('canvas,img');if(!m||m.id==='ig-pc'||m.id==='efs-pvi')return;
     sx=e.clientX;sy=e.clientY;st=Date.now();
-    if(m.id==='efs-ccanvas'&&E.mode==='freestyle'&&E.free.wm!=='none'){dr=true;dx0=e.clientX;dy0=e.clientY;}
+    if(m.id==='efs-ccanvas'&&E.mode!=='frame'&&E.free.wm!=='none'){dr=true;dx0=e.clientX;dy0=e.clientY;}
   },true);
   document.addEventListener('pointermove',e=>{
     if(!dr)return;const cc=document.getElementById('efs-ccanvas');if(!cc)return;
@@ -214,7 +262,12 @@ function initFree(){
     document.querySelectorAll('#efs-wmg .efs-wmb').forEach(x=>x.classList.remove('on'));b.classList.add('on');
     E.free.wm=b.getAttribute('data-w');E.free.ox=0;E.free.oy=0;drawCustom();
   }));
-  document.getElementById('efs-wt').addEventListener('input',e=>{E.free.txt=e.target.value;drawCustom();});
+  document.getElementById('efs-wrst').addEventListener('click',()=>{E.free.ox=0;E.free.oy=0;drawCustom();});
+  document.getElementById('efs-wt').addEventListener('input',e=>{
+    E.free.txt=e.target.value;
+    const igi=document.getElementById('ig-wt');if(igi)igi.value=e.target.value;
+    drawCustom();
+  });
 
   let raf=0;
   new MutationObserver(()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;syncDom();});}).observe(document.body,{childList:true,subtree:true});
