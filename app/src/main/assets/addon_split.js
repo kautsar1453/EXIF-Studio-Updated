@@ -58,7 +58,7 @@ function sliceUrls(){
   for(let i=0;i<n;i++){
     const sx=i*bw,sw=(i===n-1)?(tw-sx):bw,c=document.createElement('canvas');c.__isInternal=true;c.width=sw;c.height=th;
     const x=c.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(p,sx,0,sw,th,0,0,sw,th);
-    const dataUrl=E.canvasToSafeJpeg?E.canvasToSafeJpeg(c):c.toDataURL('image/jpeg',0.92);
+    const dataUrl=E.canvasToSafeJpeg?E.canvasToSafeJpeg(c):c.toDataURL('image/jpeg',0.95);
     out.push({dataUrl,fileName:'EXIF_IG_'+(i+1)+'of'+n+'_'+st+'.jpg'});
   }
   return out;
@@ -81,7 +81,6 @@ function initSplit(){
   spMod.addEventListener('click',e=>{if(e.target===spMod)spMod.classList.remove('on');});
   document.querySelectorAll('#ig-cg .ig-sb').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#ig-cg .ig-sb').forEach(x=>x.classList.remove('on'));b.classList.add('on');E.split.n=parseInt(b.getAttribute('data-n'),10)||3;drawSplit();}));
   document.querySelectorAll('#ig-ag .ig-sb').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#ig-ag .ig-sb').forEach(x=>x.classList.remove('on'));b.classList.add('on');E.split.ar=b.getAttribute('data-a')||'original';drawSplit();}));
-  ['touchstart','pointerdown'].forEach(ev=>document.getElementById('ig-svb').addEventListener(ev,()=>E.showHud&&E.showHud('Menyimpan...')));
   document.getElementById('ig-svb').addEventListener('click',()=>{
     spMod.classList.remove('on');E.showHud&&E.showHud('Menyimpan...');
     const sl=sliceUrls();
